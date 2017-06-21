@@ -6,22 +6,6 @@ import json
 import sys
 import argparse
 
-{ 
-    "RUNDECKSERVER": "rundeck server name or IP address",
-    "PORT": 4440, 
-    "SSL": false, 
-    "API_KEY": 
-    "API Key with correct privileges", 
-    "API_VERSION": 17, 
-    "PAGE_SIZE": 1000, 
-    "MAXIMUM_DAYS": 90, 
-    "TIMEOUT": 60, 
-    "DELETE_TIMEOUT": 1200, 
-    "MAX_DELETE":5000, 
-    "VERBOSE": false
-}
-
-# ...
 def main():
     '''Control all script flow'''
 
@@ -43,6 +27,12 @@ def main():
                         help='Time to expire delete queries')
     parser.add_argument('--keeping-days', metavar='Days', type=int, default=21, \
                         help='Number of days to keep logs')
+    parser.add_argument('--delete-size', metavar='N', type=int, default=1000, \
+                        help='Number of executions to delete by cycle')
+    parser.add_argument('--over-ssl', type=bool, default=False, \
+                        help='Used when Rundeck is server over HTTPS')
+    parser.add_argument('--delete-execution', type=int, default=5000, \
+                        help='Used when Rundeck is server over HTTPS')
 
     args = parser.parse_args()
 
