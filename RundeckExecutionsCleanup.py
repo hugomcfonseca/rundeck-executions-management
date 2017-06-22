@@ -113,7 +113,7 @@ def get_executions_by_job(job_id, page):
     '''...'''
 
     endpoint = URL + 'job/' + job_id + '/executions'
-    paging = {
+    params = {
         'max': CONFIGS['delete_size'],  # CHANGE ME
         'offset': page * CONFIGS['delete_size']  # CHANGE ME
     }
@@ -127,6 +127,9 @@ def get_executions_by_project(project_name, page):
     '''...'''
 
     endpoint = URL + 'project/' + project_name + '/executions'
+    params = {
+        'olderFilter': CONFIGS['keeping_days'] + 'd'
+    }
 
     return True
 
