@@ -82,7 +82,7 @@ def get_all_projects():
             project_names.append(project)
     except requests.exceptions.RequestException as exception:
         if CONFIGS['debug']:
-            print exception
+            print(exception)
         return False
 
     return project_names
@@ -103,7 +103,7 @@ def get_jobs_by_project(project_name):
             jobs_ids.append(job)
     except requests.exceptions.RequestException as exception:
         if CONFIGS['debug']:
-            print exception
+            print(exception)
         return False
 
     return jobs_ids
@@ -114,8 +114,9 @@ def get_executions_by_job(job_id, page):
 
     endpoint = URL + 'job/' + job_id + '/executions'
     params = {
-        'max': CONFIGS['delete_size'],  # CHANGE ME
-        'offset': page * CONFIGS['delete_size']  # CHANGE ME
+        'max': CONFIGS['delete_size'],
+        'offset': page * CONFIGS['delete_size'],
+        'olderFilter': CONFIGS['keeping_days'] + 'd'
     }
 
     # Filter running and scheduled execs
@@ -137,7 +138,8 @@ def get_executions_by_project(project_name, page):
 def check_execution_date(execution_date):
     '''...'''
 
-    today_seconds = time.time()
+    today_ms = time.time()
+    keep_days_ms = CONFIGS['keeping_days'] * 24 * 60 * 60 * 1000
 
     return True
 
@@ -154,16 +156,16 @@ def delete_executions(executions_ids):
         response = request.json()
 
         if response['allsuccessful']:
-            print "All requested executions were successful deleted (total of {0})". \
-                format(response['successCount'])
+            print("All requested executions were successful deleted (total of {0})". \
+                format(response['successCount']))
             return True
         else:
-            print "Errors on deleting requested executions ({0}/{1} failed)". \
-                format(response['failedCount'], response['requestCount'])
+            print("Errors on deleting requested executions ({0}/{1} failed)". \
+                format(response['failedCount'], response['requestCount']))
             return False
     except requests.exceptions.RequestException as exception:
         if CONFIGS['debug']:
-            print exception
+            print(exception)
         return False
 
 
