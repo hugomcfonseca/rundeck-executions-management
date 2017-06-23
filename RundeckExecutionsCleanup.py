@@ -1,10 +1,10 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import argparse
 import json
-import time
 
 import requests
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
 
 def init_global_vars():
@@ -40,7 +40,8 @@ def init_global_vars():
     args = parser.parse_args()
 
     if args.config_file != None:
-        return json.load(args.config_file)
+        with open(args.config_file, 'r') as props_file:
+            return json.load(props_file)
     else:
         configs = {
             'hostname': args.host,
@@ -67,81 +68,120 @@ def check_token_permissions():
     return True
 
 
-def get_all_projects():
+def get_all_projects(only_names=True):
     '''Get every project info and returns only their names'''
 
     endpoint = URL + 'projects'
-    project_names = []
+    project_info = []
 
     try:
         response = requests.get(endpoint, headers=HEADERS,
-                                verify=False, timeout=3600)
-        projects = response.json()
+                                verify=False, timeout=CONFIGS['search_time'])
+        projects_data = response.json()
 
-        for project in projects:
-            project_names.append(project)
+        for project_data in projects_data:
+            if only_names:
+                project_info.append(project_data['name'])
+            else:
+                project_info.append(project_data)
     except requests.exceptions.RequestException as exception:
         if CONFIGS['debug']:
             print(exception)
-        return False
+        return None
 
-    return project_names
+    return project_info
 
 
-def get_jobs_by_project(project_name):
-    '''...'''
+def get_jobs_by_project(project_name, only_ids=True):
+    '''Get jobs by a given project '''
 
     endpoint = URL + 'project/' + project_name + '/jobs'
-    jobs_ids = []
+    job_info = []
 
     try:
         response = requests.get(endpoint, headers=HEADERS,
                                 verify=False, timeout=3600)
-        jobs = response.json()
+        jobs_data = response.json()
 
-        for job in jobs:
-            jobs_ids.append(job)
+        for job_data in jobs_data:
+            if only_ids:
+                job_id = job_data.get('id')
+                job_info.append(job_id)
+            else:
+                job_info.append(job_data)
     except requests.exceptions.RequestException as exception:
         if CONFIGS['debug']:
             print(exception)
         return False
 
-    return jobs_ids
+    return job_info
 
 
-def get_executions_by_job(job_id, page):
-    '''...'''
+def get_executions(job_id, page, job_filter=True, only_ids=True):
+    '''Get executions older than a given number of days by job or project '''
 
-    endpoint = URL + 'job/' + job_id + '/executions'
+    execution_info = []
+
+    if job_filter:
+        endpoint = URL + 'job/' + job_id + '/executions'
+    else:
+        endpoint = URL + 'project/' + job_id + '/executions'
+
     params = {
         'max': CONFIGS['delete_size'],
         'offset': page * CONFIGS['delete_size'],
-        'olderFilter': CONFIGS['keeping_days'] + 'd'
+        'olderFilter': str(CONFIGS['keeping_days']) + 'd'
     }
 
-    # Filter running and scheduled execs
+    try:
+        response = requests.get(endpoint, params=params, headers=HEADERS,
+                                verify=False, timeout=3600)
+        executions_data = response.json()
 
-    return True
+        for execution_data in executions_data['executions']:
+            status = execution_data.get('status')
+
+            if status != "running":
+                if only_ids:
+                    execution_id = execution_data.get('id')
+                    execution_info.append(execution_id)
+                else:
+                    execution_info.append(execution_data)
+    except requests.exceptions.RequestException as exception:
+        if CONFIGS['debug']:
+            print(exception)
+        return None
+
+    return execution_info
 
 
-def get_executions_by_project(project_name, page):
-    '''...'''
+def get_executions_total(id, job_filter=True):
+    '''Get executions counter by project '''
 
-    endpoint = URL + 'project/' + project_name + '/executions'
+    executions_count = 0
+
+    if job_filter:
+        endpoint = URL + 'job/' + id + '/executions'
+    else:
+        endpoint = URL + 'project/' + id + '/executions'
+
     params = {
-        'olderFilter': CONFIGS['keeping_days'] + 'd'
+        'olderFilter': str(CONFIGS['keeping_days']) + 'd'
     }
 
-    return True
+    try:
+        response = requests.get(endpoint, params=params, headers=HEADERS,
+                                verify=False, timeout=CONFIGS['search_time'])
+        executions_data = response.json()
 
+        executions_count = executions_data['paging']['total']
 
-def check_execution_date(execution_date):
-    '''...'''
+    except requests.exceptions.RequestException as exception:
+        if CONFIGS['debug']:
+            print(exception)
+        return None
 
-    today_ms = time.time()
-    keep_days_ms = CONFIGS['keeping_days'] * 24 * 60 * 60 * 1000
-
-    return True
+    return executions_count
 
 
 def delete_executions(executions_ids):
@@ -152,16 +192,16 @@ def delete_executions(executions_ids):
 
     try:
         request = requests.post(
-            endpoint, headers=HEADERS, data=data, verify=False, timeout=3600)
+            endpoint, headers=HEADERS, data=data, verify=False, timeout=CONFIGS['delete_time'])
         response = request.json()
 
         if response['allsuccessful']:
-            print("All requested executions were successful deleted (total of {0})". \
-                format(response['successCount']))
+            print("All requested executions were successful deleted (total of {0})".
+                  format(response['successCount']))
             return True
         else:
-            print("Errors on deleting requested executions ({0}/{1} failed)". \
-                format(response['failedCount'], response['requestCount']))
+            print("Errors on deleting requested executions ({0}/{1} failed)".
+                  format(response['failedCount'], response['requestCount']))
             return False
     except requests.exceptions.RequestException as exception:
         if CONFIGS['debug']:
@@ -174,7 +214,11 @@ if __name__ == "__main__":
 
     CONFIGS = init_global_vars()
 
-    proto = 'https' if CONFIGS["over_ssl"] else 'http'
+    if CONFIGS['over_ssl']:
+        proto = 'https'
+        requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+    else:
+        proto = 'http'
 
     URL = '{0}://{1}:{2}/api/{3}/'.format(
         proto, CONFIGS["hostname"], CONFIGS["port"], CONFIGS["api_version"])
@@ -183,3 +227,21 @@ if __name__ == "__main__":
         'X-RunDeck-Auth-Token': CONFIGS['token'],
         'Accept': 'application/json'
     }
+
+    # Number of deletions/executions get from page_size/10
+
+    projects = get_all_projects()
+
+    for project in projects:
+        page_number = 1
+
+        if CONFIGS['execs_by_project']:
+            count_execs = get_executions_total(project, False)
+            total_pages = count_execs / 200
+
+            for page_n in (page_number, total_pages):
+                executions = get_executions(project, page_n, False)
+        else:
+            jobs = get_jobs_by_project(project)
+            for job in jobs:
+                executions = get_executions(job, page_number, True)
