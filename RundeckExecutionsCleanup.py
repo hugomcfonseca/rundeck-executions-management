@@ -60,6 +60,17 @@ def init_global_vars():
     return configs
 
 
+def get_page_count(total):
+    '''...'''
+
+    counter = int(total / 200)
+
+    if total % 200 > 0:
+        counter += 1
+
+    return counter
+
+
 def check_token_permissions():
     '''Used to validate API token deleting permissions'''
 
@@ -100,7 +111,7 @@ def get_jobs_by_project(project_name, only_ids=True):
 
     try:
         response = requests.get(endpoint, headers=HEADERS,
-                                verify=False, timeout=3600)
+                                verify=False, timeout=CONFIGS['search_time'])
         jobs_data = response.json()
 
         for job_data in jobs_data:
@@ -127,15 +138,15 @@ def get_executions(job_id, page, job_filter=True, only_ids=True):
     else:
         endpoint = URL + 'project/' + job_id + '/executions'
 
-    params = {
+    parameters = {
         'max': CONFIGS['delete_size'],
         'offset': page * CONFIGS['delete_size'],
         'olderFilter': str(CONFIGS['keeping_days']) + 'd'
     }
 
     try:
-        response = requests.get(endpoint, params=params, headers=HEADERS,
-                                verify=False, timeout=3600)
+        response = requests.get(endpoint, params=parameters, headers=HEADERS,
+                                verify=False, timeout=CONFIGS['search_time'])
         executions_data = response.json()
 
         for execution_data in executions_data['executions']:
@@ -165,17 +176,15 @@ def get_executions_total(id, job_filter=True):
     else:
         endpoint = URL + 'project/' + id + '/executions'
 
-    params = {
+    parameters = {
         'olderFilter': str(CONFIGS['keeping_days']) + 'd'
     }
 
     try:
-        response = requests.get(endpoint, params=params, headers=HEADERS,
+        response = requests.get(endpoint, params=parameters, headers=HEADERS,
                                 verify=False, timeout=CONFIGS['search_time'])
         executions_data = response.json()
-
         executions_count = executions_data['paging']['total']
-
     except requests.exceptions.RequestException as exception:
         if CONFIGS['debug']:
             print(exception)
@@ -233,14 +242,18 @@ if __name__ == "__main__":
     projects = get_all_projects()
 
     for project in projects:
-        page_number = 1
+        page_number = 0
 
         if CONFIGS['execs_by_project']:
             count_execs = get_executions_total(project, False)
-            total_pages = count_execs / 200
+            total_pages = get_page_count(count_execs)
 
-            for page_n in (page_number, total_pages):
-                executions = get_executions(project, page_n, False)
+            for actual_page in range(page_number, total_pages):
+                executions = get_executions(project, actual_page, False)
+                success = delete_executions(executions)
+
+                if not success:
+                    break
         else:
             jobs = get_jobs_by_project(project)
             for job in jobs:
