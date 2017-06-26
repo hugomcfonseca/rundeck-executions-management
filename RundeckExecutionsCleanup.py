@@ -3,6 +3,7 @@
 import argparse
 import json
 
+import logging
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
@@ -236,8 +237,6 @@ if __name__ == "__main__":
         'X-RunDeck-Auth-Token': CONFIGS['token'],
         'Accept': 'application/json'
     }
-
-    # Number of deletions/executions get from page_size/10
 
     projects = get_all_projects()
 
