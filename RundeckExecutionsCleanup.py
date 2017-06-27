@@ -3,9 +3,11 @@
 import argparse
 import json
 
-import logging
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
+
+#import modules.logger
+#import modules.rundeck
 
 
 def init_global_vars():
