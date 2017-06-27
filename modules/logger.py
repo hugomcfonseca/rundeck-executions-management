@@ -4,7 +4,7 @@ import logging
 import sys
 
 
-class Logger(object):
+class Logger:
     '''...'''
 
     def __init__(self, level=3, formatter=None):
