@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import math
 
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
@@ -66,12 +67,7 @@ def init_global_vars():
 def get_page_count(total):
     '''...'''
 
-    counter = int(total / 200)
-
-    if total % 200 > 0:
-        counter += 1
-
-    return counter
+    return int(math.ceil(total / 200))
 
 
 def check_token_permissions():
@@ -138,14 +134,16 @@ def get_executions(job_id, page, job_filter=True, only_ids=True):
 
     if job_filter:
         endpoint = URL + 'job/' + job_id + '/executions'
+        parameters = {
+            'max': CONFIGS['delete_size'],
+            'offset': page * CONFIGS['delete_size'],
+        }
     else:
         endpoint = URL + 'project/' + job_id + '/executions'
-
-    parameters = {
-        'max': CONFIGS['delete_size'],
-        'offset': page * CONFIGS['delete_size'],
-        'olderFilter': str(CONFIGS['keeping_days']) + 'd'
-    }
+        parameters = {
+            'max': CONFIGS['delete_size'],
+            'olderFilter': str(CONFIGS['keeping_days']) + 'd'
+        }
 
     try:
         response = requests.get(endpoint, params=parameters, headers=HEADERS,
@@ -251,9 +249,10 @@ if __name__ == "__main__":
 
             for actual_page in range(page_number, total_pages):
                 executions = get_executions(project, actual_page, False)
-                success = delete_executions(executions)
 
-                if not success:
+                if executions:
+                    success = delete_executions(executions)
+                elif not executions or not success:
                     break
         else:
             jobs = get_jobs_by_project(project)
