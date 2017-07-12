@@ -3,14 +3,18 @@
 import json
 import requests
 
+from modules.base import get_num_pages
+import modules.logger
 
 class RundeckApi:
     '''...'''
 
-    def __init__(self, url, headers, token, check_ssl=False, read_time=60, write_time=150):
+    def __init__(self, url, headers, token, days_to_keep, check_ssl=False, read_time=60, 
+                 write_time=150):
         self.url = url
         self.headers = headers
         self.token = token
+        self.days_to_keep = days_to_keep
         self.check_ssl = check_ssl
         self.read_time = read_time
         self.write_time = write_time
@@ -117,7 +121,7 @@ class RundeckApi:
             endpoint = self.url + 'project/' + id + '/executions'
 
         parameters = {
-            'olderFilter': str(CONFIGS['keeping_days']) + 'd'
+            'olderFilter': str(self.days_to_keep) + 'd'
         }
 
         try:
@@ -155,3 +159,36 @@ class RundeckApi:
             if CONFIGS['debug']:
                 print(exception)
             return False
+
+
+    def delete_old_logs(self, ):
+        '''...'''
+
+        projects = self.get_all_projects()
+
+        for project in projects:
+            page_number = 0
+
+            if CONFIGS['execs_by_project']:
+                count_execs = self.get_executions_total(project, False)
+                total_pages = get_num_pages(count_execs)
+
+                for actual_page in range(page_number, total_pages):
+                    executions = self.get_executions(project, actual_page, False)
+
+                    if executions:
+                        success = self.delete_executions(executions)
+                    elif not executions or not success:
+                        break
+            else:
+                jobs = self.get_jobs_by_project(project)
+                for job in jobs:
+                    executions = self.get_executions(job, page_number, True)
+
+    def listing_running_jobs(self):
+        '''...'''
+        
+        projects = self.get_all_projects()
+
+        for project in projects:
+            

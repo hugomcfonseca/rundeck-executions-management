@@ -7,75 +7,14 @@ import math
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
+import modules.base
 #import modules.logger
 #import modules.rundeck
-
-
-def init_global_vars():
-    '''Initialization of global variables'''
-
-    parser = argparse.ArgumentParser(
-        description='Delete old and/or obsolete executions on Rundeck')
-    parser.add_argument('-c', '--config-file', metavar='File', type=str, default=None,
-                        help='JSON file with configurations')
-    parser.add_argument('--host', metavar='Host', type=str, default='localhost',
-                        help='IP address or domain of Rundeck')
-    parser.add_argument('--port', metavar='Port', type=int, default=4440,
-                        help='Port of Rundeck')
-    parser.add_argument('--auth', metavar='Token', type=str,
-                        help='API token with correct permissions')
-    parser.add_argument('--api-version', metavar='Version', type=int, default=19,
-                        help='API version of Rundeck')
-    parser.add_argument('--search-time', metavar='Seconds', type=int, default=60,
-                        help='Time to expire search queries')
-    parser.add_argument('--delete-time', metavar='Seconds', type=int, default=1200,
-                        help='Time to expire delete queries')
-    parser.add_argument('--keeping-days', metavar='Days', type=int, default=21,
-                        help='Number of days to keep logs')
-    parser.add_argument('--delete-size', metavar='N', type=int, default=1000,
-                        help='Number of executions to delete by cycle')
-    parser.add_argument('--over-ssl', default=False, action='store_true',
-                        help='Used when Rundeck is server over HTTPS')
-    parser.add_argument('--debug', default=False, action='store_true',
-                        help='Used to print executed operations')
-    parser.add_argument('--execs-by-project', default=False, action='store_true',
-                        help='Either delete defined range of executions by jobs or projects')
-
-    args = parser.parse_args()
-
-    if args.config_file != None:
-        with open(args.config_file, 'r') as props_file:
-            return json.load(props_file)
-    else:
-        configs = {
-            'hostname': args.host,
-            'port': args.port,
-            'token': args.auth,
-            'api_version': args.api_version,
-            'search_time': args.search_time,
-            'delete_time': args.delete_time,
-            'keeping_days': args.keeping_days,
-            'delete_size': args.delete_size,
-            'over_ssl': args.over_ssl,
-            'debug': args.debug,
-            'execs_by_project': args.execs_by_project
-        }
-
-    return configs
-
 
 def get_page_count(total):
     '''...'''
 
-    return int(math.ceil(total / 200))
-
-
-def check_token_permissions():
-    '''Used to validate API token deleting permissions'''
-
-    endpoint = ''
-
-    return True
+    return int(math.ceil(total / float(200)))
 
 
 def get_all_projects(only_names=True):
@@ -95,7 +34,7 @@ def get_all_projects(only_names=True):
             else:
                 project_info.append(project_data)
     except requests.exceptions.RequestException as exception:
-        if CONFIGS['debug']:
+        if CONFIGS['verbose']:
             print(exception)
         return None
 
@@ -120,7 +59,7 @@ def get_jobs_by_project(project_name, only_ids=True):
             else:
                 job_info.append(job_data)
     except requests.exceptions.RequestException as exception:
-        if CONFIGS['debug']:
+        if CONFIGS['verbose']:
             print(exception)
         return False
 
@@ -160,22 +99,22 @@ def get_executions(job_id, page, job_filter=True, only_ids=True):
                 else:
                     execution_info.append(execution_data)
     except requests.exceptions.RequestException as exception:
-        if CONFIGS['debug']:
+        if CONFIGS['verbose']:
             print(exception)
         return None
 
     return execution_info
 
 
-def get_executions_total(id, job_filter=True):
-    '''Get executions counter by project '''
+def get_executions_total(identifier, job_filter=True):
+    '''Get executions counter by project or job'''
 
     executions_count = 0
 
     if job_filter:
-        endpoint = URL + 'job/' + id + '/executions'
+        endpoint = URL + 'job/' + identifier + '/executions'
     else:
-        endpoint = URL + 'project/' + id + '/executions'
+        endpoint = URL + 'project/' + identifier + '/executions'
 
     parameters = {
         'olderFilter': str(CONFIGS['keeping_days']) + 'd'
@@ -187,7 +126,7 @@ def get_executions_total(id, job_filter=True):
         executions_data = response.json()
         executions_count = executions_data['paging']['total']
     except requests.exceptions.RequestException as exception:
-        if CONFIGS['debug']:
+        if CONFIGS['verbose']:
             print(exception)
         return None
 
@@ -206,7 +145,7 @@ def delete_executions(executions_ids):
         response = request.json()
 
         if response['allsuccessful']:
-            print("All requested executions were successful deleted (total of {0})".
+            print("All requested executions were successfully deleted (total of {0})".
                   format(response['successCount']))
             return True
         else:
@@ -214,7 +153,7 @@ def delete_executions(executions_ids):
                   format(response['failedCount'], response['requestCount']))
             return False
     except requests.exceptions.RequestException as exception:
-        if CONFIGS['debug']:
+        if CONFIGS['verbose']:
             print(exception)
         return False
 
@@ -222,7 +161,7 @@ def delete_executions(executions_ids):
 # Calling main
 if __name__ == "__main__":
 
-    CONFIGS = init_global_vars()
+    CONFIGS = modules.base.parse_args('Listing running jobs and delete old logs from your Rundeck server.')
 
     if CONFIGS['over_ssl']:
         proto = 'https'

@@ -21,7 +21,7 @@ By default, this script needs at least one of two parameters: a configuration fi
 ```
 
 ## Configuration file
-The configuration file used by the script must follow JSON format and have, at least, the _token_ key. Next, it is presented its format and all available keys:
+The configuration file must follow JSON format and have, at least, a valid _token_ with write permissions. Next, it is presented its format and all available keys:
 
 ```json
 {
