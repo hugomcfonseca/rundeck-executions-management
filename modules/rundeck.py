@@ -4,21 +4,31 @@ import json
 import requests
 
 from modules.base import get_num_pages
-import modules.logger
+from modules.logger import Logger
+
 
 class RundeckApi:
     '''...'''
 
-    def __init__(self, url, headers, token, days_to_keep, check_ssl=False, read_time=60, 
-                 write_time=150):
-        self.url = url
-        self.headers = headers
-        self.token = token
-        self.days_to_keep = days_to_keep
-        self.check_ssl = check_ssl
-        self.read_time = read_time
-        self.write_time = write_time
+    def __init__(self, configs, mode='cleanup'):
 
+        self.url = configs.URL
+        self.headers = configs.headers
+        self.ssl = configs.SSL
+        self.token = configs.token
+        self.max = configs.max
+        self.read_time = configs.read_time
+        self.verbose = configs.verbose
+        self.debug = configs.debug
+
+        if mode == "listing":
+            self.status = configs.execution_status
+            self.filter_project = configs.filter_project
+        else:
+            self.keeping_time = configs.keeping_time
+            self.write_time = configs.write_time
+
+        self.logger = Logger()
 
     def check_my_token(self, token):
         '''...'''
@@ -34,7 +44,7 @@ class RundeckApi:
 
         try:
             response = requests.get(endpoint, headers=self.headers,
-                                    verify=self.check_ssl, timeout=self.read_time)
+                                    verify=self.ssl, timeout=self.read_time)
             projects_data = response.json()
 
             for project_data in projects_data:
@@ -43,8 +53,8 @@ class RundeckApi:
                 else:
                     project_info.append(project_data)
         except requests.exceptions.RequestException as exception:
-            if CONFIGS['debug']:
-                print(exception)
+            if self.debug:
+                self.logger.write_to_log(exception)
             return None
 
         return project_info
@@ -57,7 +67,7 @@ class RundeckApi:
 
         try:
             response = requests.get(endpoint, headers=self.headers,
-                                    verify=self.check_ssl, timeout=self.read_time)
+                                    verify=self.ssl, timeout=self.read_time)
             jobs_data = response.json()
 
             for job_data in jobs_data:
@@ -67,8 +77,8 @@ class RundeckApi:
                 else:
                     job_info.append(job_data)
         except requests.exceptions.RequestException as exception:
-            if CONFIGS['debug']:
-                print(exception)
+            if self.debug:
+                self.logger.write_to_log(exception)
             return False
 
         return job_info
@@ -84,14 +94,14 @@ class RundeckApi:
             endpoint = self.url + 'project/' + job_id + '/executions'
 
         parameters = {
-            'max': CONFIGS['delete_size'],
-            'offset': page * CONFIGS['delete_size'],
-            'olderFilter': str(CONFIGS['keeping_days']) + 'd'
+            'max': self.max,
+            'offset': page * self.max,
+            'olderFilter': self.keeping_time
         }
 
         try:
             response = requests.get(endpoint, params=parameters, headers=self.headers,
-                                    verify=self.check_ssl, timeout=self.read_time)
+                                    verify=self.ssl, timeout=self.read_time)
             executions_data = response.json()
 
             for execution_data in executions_data['executions']:
@@ -104,8 +114,8 @@ class RundeckApi:
                     else:
                         execution_info.append(execution_data)
         except requests.exceptions.RequestException as exception:
-            if CONFIGS['debug']:
-                print(exception)
+            if self.debug:
+                self.logger.write_to_log(exception)
             return None
 
         return execution_info
@@ -121,17 +131,17 @@ class RundeckApi:
             endpoint = self.url + 'project/' + id + '/executions'
 
         parameters = {
-            'olderFilter': str(self.days_to_keep) + 'd'
+            'olderFilter': self.keeping_time
         }
 
         try:
             response = requests.get(endpoint, params=parameters, headers=self.headers,
-                                    verify=self.check_ssl, timeout=self.read_time)
+                                    verify=self.ssl, timeout=self.read_time)
             executions_data = response.json()
             executions_count = executions_data['paging']['total']
         except requests.exceptions.RequestException as exception:
-            if CONFIGS['debug']:
-                print(exception)
+            if self.debug:
+                self.logger.write_to_log(exception)
             return None
 
         return executions_count
@@ -144,22 +154,21 @@ class RundeckApi:
 
         try:
             request = requests.post(endpoint, headers=self.headers,
-                                    data=data, verify=self.check_ssl, timeout=self.write_time)
+                                    data=data, verify=self.ssl, timeout=self.write_time)
             response = request.json()
 
             if response['allsuccessful']:
-                print("All requested executions were successful deleted (total of {0})".
-                      format(response['successCount']))
+                self.logger.write_to_log("All requested executions were successful deleted (total of {0})".
+                                         format(response['successCount']))
                 return True
             else:
-                print("Errors on deleting requested executions ({0}/{1} failed)".
-                      format(response['failedCount'], response['requestCount']))
+                self.logger.write_to_log("Errors on deleting requested executions ({0}/{1} failed)".
+                                         format(response['failedCount'], response['requestCount']))
                 return False
         except requests.exceptions.RequestException as exception:
-            if CONFIGS['debug']:
-                print(exception)
+            if self.debug:
+                self.logger.write_to_log(exception)
             return False
-
 
     def delete_old_logs(self, ):
         '''...'''
@@ -174,7 +183,8 @@ class RundeckApi:
                 total_pages = get_num_pages(count_execs)
 
                 for actual_page in range(page_number, total_pages):
-                    executions = self.get_executions(project, actual_page, False)
+                    executions = self.get_executions(
+                        project, actual_page, False)
 
                     if executions:
                         success = self.delete_executions(executions)
@@ -187,8 +197,5 @@ class RundeckApi:
 
     def listing_running_jobs(self):
         '''...'''
-        
-        projects = self.get_all_projects()
 
-        for project in projects:
-            
+        projects = self.get_all_projects()

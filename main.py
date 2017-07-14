@@ -8,8 +8,9 @@ import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
 import modules.base
-#import modules.logger
-#import modules.rundeck
+from modules.logger import Logger
+#from modules.rundeck import RundeckApi
+
 
 def get_page_count(total):
     '''...'''
@@ -161,7 +162,9 @@ def delete_executions(executions_ids):
 # Calling main
 if __name__ == "__main__":
 
-    CONFIGS = modules.base.parse_args('Listing running jobs and delete old logs from your Rundeck server.')
+    CONFIGS = modules.base.parse_args(
+        'Listing running jobs and delete old logs from your Rundeck server.')
+    LOGGING = Logger(level=2)
 
     if CONFIGS['over_ssl']:
         proto = 'https'
@@ -184,7 +187,16 @@ if __name__ == "__main__":
 
         if CONFIGS['execs_by_project']:
             count_execs = get_executions_total(project, False)
-            total_pages = get_page_count(count_execs)
+            total_pages = modules.base.get_num_pages(count_execs)
+
+            if count_execs > 0:
+                LOGGING.write_to_log("[" + str(project) + "]:" + "There are " + str(count_execs) +
+                                     " old logs deletable", log_level=2)
+                LOGGING.write_to_log("[" + str(project) + "]:" + "Processing logs deleting in " +
+                                     str(total_pages) + " cycles.", log_level=2)
+            else:
+                LOGGING.write_to_log("[" + str(project) + "]:" + "There are no jobs deletable",
+                                     log_level=2)
 
             for actual_page in range(page_number, total_pages):
                 executions = get_executions(project, actual_page, False)

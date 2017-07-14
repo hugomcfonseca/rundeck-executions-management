@@ -4,11 +4,11 @@ import argparse
 import math
 import json
 
+
 def parse_args(message=None):
     '''Initialization of global variables'''
 
-    parser = argparse.ArgumentParser(
-        description='Listing running jobs and delete old logs from your Rundeck server.')
+    parser = argparse.ArgumentParser(description=message)
     parser.add_argument('-c', '--config-file', metavar='File', type=str, required=True,
                         help='JSON file with configurations')
     parser.add_argument('-m', '--mode', metavar='Mode', type=str, default='cleanup',
@@ -24,6 +24,5 @@ def parse_args(message=None):
 
 def get_num_pages(n_executions, divider=200):
     '''...'''
-    
-    return int(math.ceil(total / float(200)))
 
+    return int(math.ceil(n_executions / float(divider)))
