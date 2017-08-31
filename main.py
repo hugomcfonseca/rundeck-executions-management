@@ -3,19 +3,12 @@
 import argparse
 import json
 import math
-
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
 import modules.base
 from modules.logger import Logger
 #from modules.rundeck import RundeckApi
-
-
-def get_page_count(total):
-    '''...'''
-
-    return int(math.ceil(total / float(200)))
 
 
 def get_all_projects(only_names=True):
@@ -187,18 +180,19 @@ if __name__ == "__main__":
 
         if CONFIGS['execs_by_project']:
             count_execs = get_executions_total(project, False)
-            total_pages = modules.base.get_num_pages(count_execs)
+            total_pages = modules.base.get_num_pages(
+                count_execs, CONFIGS["delete_size"])
 
             if count_execs > 0:
-                LOGGING.write_to_log("[" + str(project) + "]:" + "There are " + str(count_execs) +
-                                     " old logs deletable", log_level=2)
-                LOGGING.write_to_log("[" + str(project) + "]:" + "Processing logs deleting in " +
+                LOGGING.write_to_log("[" + str(project) + "]: There are " + str(count_execs) +
+                                     " old deletable executions", log_level=2)
+                LOGGING.write_to_log("[" + str(project) + "]: Processing executions deleting in " +
                                      str(total_pages) + " cycles.", log_level=2)
             else:
-                LOGGING.write_to_log("[" + str(project) + "]:" + "There are no jobs deletable",
+                LOGGING.write_to_log("[" + str(project) + "]: There are no deletable executions",
                                      log_level=2)
 
-            for actual_page in range(page_number, total_pages):
+            for actual_page in range(page_number, total_pages + 1):
                 executions = get_executions(project, actual_page, False)
 
                 if executions:
@@ -208,4 +202,25 @@ if __name__ == "__main__":
         else:
             jobs = get_jobs_by_project(project)
             for job in jobs:
-                executions = get_executions(job, page_number, True)
+                count_execs = get_executions_total(job)
+                total_pages = modules.base.get_num_pages(
+                    count_execs, CONFIGS["delete_size"])
+
+                if count_execs > 0:
+                    LOGGING.write_to_log("[" + str(project) + "]: There are " + str(count_execs) +
+                                        " old deletable executions", log_level=2)
+                    LOGGING.write_to_log("[" + str(project) + "]: Processing executions deleting in " +
+                                        str(total_pages) + " cycles.", log_level=2)
+                else:
+                    LOGGING.write_to_log("[" + str(project) + "]: There are no deletable executions",
+                                        log_level=2)
+
+                for actual_page in range(page_number, total_pages + 1):
+                    executions = get_executions(job, actual_page)
+
+                    if executions:
+                        success = delete_executions(executions)
+                    elif not executions or not success:
+                        break
+
+    exit(0)
