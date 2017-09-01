@@ -26,3 +26,15 @@ def get_num_pages(n_executions, divider=200):
     '''...'''
 
     return int(math.ceil(n_executions / float(divider)))
+
+
+def validate_keeping_time(keep_time):
+    '''Check if keep_time has the required nomenclature: number of days followed by the time unit'''
+
+    number = keep_time[:-1]
+    unit = keep_time[-1:]
+
+    if number.isdigit() and unit in ['h', 'd', 'w', 'm', 'y']:
+        return True
+
+    return False

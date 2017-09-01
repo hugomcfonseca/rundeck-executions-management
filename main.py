@@ -1,8 +1,6 @@
 #!/usr/bin/python3
 
-import argparse
 import json
-import math
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
@@ -75,7 +73,7 @@ def get_executions(job_id, page, job_filter=True, only_ids=True):
         endpoint = URL + 'project/' + job_id + '/executions'
         parameters = {
             'max': CONFIGS['delete_size'],
-            'olderFilter': str(CONFIGS['keeping_days']) + 'd'
+            'olderFilter': str(CONFIGS['keeping_days'])
         }
 
     try:
@@ -111,7 +109,8 @@ def get_executions_total(identifier, job_filter=True):
         endpoint = URL + 'project/' + identifier + '/executions'
 
     parameters = {
-        'olderFilter': str(CONFIGS['keeping_days']) + 'd'
+        'olderFilter': str(CONFIGS['keeping_days']),
+        'max': 1
     }
 
     try:
@@ -159,6 +158,10 @@ if __name__ == "__main__":
         'Listing running jobs and delete old logs from your Rundeck server.')
     LOGGING = Logger(level=2)
 
+    if not modules.base.validate_keeping_time(CONFIGS['keeping_days']):
+        LOGGING.write_to_log("Invalid parameter \'keeping_days\'. Exiting...")
+        exit(1)
+
     if CONFIGS['over_ssl']:
         proto = 'https'
         requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
@@ -169,17 +172,26 @@ if __name__ == "__main__":
         proto, CONFIGS["hostname"], CONFIGS["port"], CONFIGS["api_version"])
     HEADERS = {
         'Content-Type': 'application/json',
-        'X-RunDeck-Auth-Token': CONFIGS['token'],
+        'X-Rundeck-Auth-Token': CONFIGS['token'],
         'Accept': 'application/json'
     }
 
     projects = get_all_projects()
+
+    if projects is None:
+        LOGGING.write_to_log("Error on reading Rundeck projects. Exiting...")
+        exit(1)
 
     for project in projects:
         page_number = 0
 
         if CONFIGS['execs_by_project']:
             count_execs = get_executions_total(project, False)
+
+            if count_execs is None:
+                LOGGING.write_to_log("Error on reading counter of Rundeck executions. Exiting...")
+                exit(1)
+
             total_pages = modules.base.get_num_pages(
                 count_execs, CONFIGS["delete_size"])
 
@@ -195,10 +207,11 @@ if __name__ == "__main__":
             for actual_page in range(page_number, total_pages + 1):
                 executions = get_executions(project, actual_page, False)
 
-                if executions:
+                if executions is None:
+                    LOGGING.write_to_log("Error on reading Rundeck executions. Exiting...")
+                    exit(1)
+                else:
                     success = delete_executions(executions)
-                elif not executions or not success:
-                    break
         else:
             jobs = get_jobs_by_project(project)
             for job in jobs:
@@ -208,12 +221,12 @@ if __name__ == "__main__":
 
                 if count_execs > 0:
                     LOGGING.write_to_log("[" + str(project) + "]: There are " + str(count_execs) +
-                                        " old deletable executions", log_level=2)
+                                         " old deletable executions", log_level=2)
                     LOGGING.write_to_log("[" + str(project) + "]: Processing executions deleting in " +
-                                        str(total_pages) + " cycles.", log_level=2)
+                                         str(total_pages) + " cycles.", log_level=2)
                 else:
                     LOGGING.write_to_log("[" + str(project) + "]: There are no deletable executions",
-                                        log_level=2)
+                                         log_level=2)
 
                 for actual_page in range(page_number, total_pages + 1):
                     executions = get_executions(job, actual_page)
@@ -224,3 +237,4 @@ if __name__ == "__main__":
                         break
 
     exit(0)
+    
