@@ -3,7 +3,6 @@
 import json
 import requests
 
-from modules.base import get_num_pages
 from modules.logger import Logger
 
 
@@ -131,7 +130,8 @@ class RundeckApi:
             endpoint = self.url + 'project/' + id + '/executions'
 
         parameters = {
-            'olderFilter': self.keeping_time
+            'olderFilter': self.keeping_time,
+            'max': 1
         }
 
         try:
@@ -169,33 +169,3 @@ class RundeckApi:
             if self.debug:
                 self.logger.write_to_log(exception)
             return False
-
-    def delete_old_logs(self, ):
-        '''...'''
-
-        projects = self.get_all_projects()
-
-        for project in projects:
-            page_number = 0
-
-            if CONFIGS['execs_by_project']:
-                count_execs = self.get_executions_total(project, False)
-                total_pages = get_num_pages(count_execs)
-
-                for actual_page in range(page_number, total_pages):
-                    executions = self.get_executions(
-                        project, actual_page, False)
-
-                    if executions:
-                        success = self.delete_executions(executions)
-                    elif not executions or not success:
-                        break
-            else:
-                jobs = self.get_jobs_by_project(project)
-                for job in jobs:
-                    executions = self.get_executions(job, page_number, True)
-
-    def listing_running_jobs(self):
-        '''...'''
-
-        projects = self.get_all_projects()
