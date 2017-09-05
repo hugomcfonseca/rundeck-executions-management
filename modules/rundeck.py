@@ -4,6 +4,7 @@ import json
 import requests
 
 from modules.logger import Logger
+from base import parse_json_response
 
 
 class RundeckApi:
@@ -39,24 +40,23 @@ class RundeckApi:
         '''Get every project info and returns only their names'''
 
         endpoint = self.url + 'projects'
-        project_info = []
+        status = False
 
         try:
             response = requests.get(endpoint, headers=self.headers,
-                                    verify=self.ssl, timeout=self.read_time)
-            projects_data = response.json()
+                                    verify=False, timeout=self.read_time)
+            if only_names:
+                status, project_info = parse_json_response(response, None, 'name')
+            else:
+                status, project_info = parse_json_response(response)
 
-            for project_data in projects_data:
-                if only_names:
-                    project_info.append(project_data['name'])
-                else:
-                    project_info.append(project_data)
+            if status:
+                return project_info
         except requests.exceptions.RequestException as exception:
             if self.debug:
-                self.logger.write_to_log(exception)
-            return None
+                print(exception)
 
-        return project_info
+        return False
 
     def get_jobs_by_project(self, project_name, only_ids=True):
         '''Get jobs by a given project '''

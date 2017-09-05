@@ -5,7 +5,7 @@ import requests
 import signal
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
-import modules.base
+import modules.base as base
 from modules.logger import Logger
 #from modules.rundeck import RundeckApi
 
@@ -14,77 +14,90 @@ def get_all_projects(only_names=True):
     '''Get every project info and returns only their names'''
 
     endpoint = URL + 'projects'
+    status = False
 
     try:
         response = requests.get(endpoint, headers=HEADERS,
-                                verify=False, timeout=CONFIGS['SEARCH_TIMEOUT'])
+                                verify=False, timeout=CONFIGS.search_timeout)
         if only_names:
-            _, project_info = modules.base.parse_json_response(response, None, 'name')
+            status, project_info = base.parse_json_response(
+                response, None, 'name')
         else:
-            _, project_info = modules.base.parse_json_response(response)
-    except requests.exceptions.RequestException as exception:
-        if CONFIGS['VERBOSE']:
-            print(exception)
-        return False
+            status, project_info = base.parse_json_response(response)
 
-    return project_info
+        if status:
+            return project_info
+    except requests.exceptions.RequestException as exception:
+        if CONFIGS.debug:
+            print(exception)
+
+    return False
 
 
 def get_jobs_by_project(project_name, only_ids=True):
     '''Get jobs by a given project '''
 
     endpoint = URL + 'project/' + project_name + '/jobs'
+    status = False
 
     try:
         response = requests.get(endpoint, headers=HEADERS,
-                                verify=False, timeout=CONFIGS['SEARCH_TIMEOUT'])
+                                verify=False, timeout=CONFIGS.search_timeout)
         if only_ids:
-            _, job_info = modules.base.parse_json_response(response, None, 'id')
+            status, job_info = base.parse_json_response(response, None, 'id')
         else:
-            _, job_info = modules.base.parse_json_response(response)
-    except requests.exceptions.RequestException as exception:
-        if CONFIGS['VERBOSE']:
-            print(exception)
-        return False
+            status, job_info = base.parse_json_response(response)
 
-    return job_info
+        if status:
+            return job_info
+    except requests.exceptions.RequestException as exception:
+        if CONFIGS.debug:
+            print(exception)
+
+    return False
 
 
 def get_executions(job_id, page, job_filter=True, only_ids=True):
     '''Get executions older than a given number of days by job or project '''
 
+    status = False
+
     if job_filter:
         endpoint = URL + 'job/' + job_id + '/executions'
         parameters = {
-            'max': CONFIGS['CHUNK_SIZE'],
-            'offset': page * CONFIGS['CHUNK_SIZE'],
+            'max': CONFIGS.chunk_size,
+            'offset': page * CONFIGS.chunk_size,
         }
     else:
         endpoint = URL + 'project/' + job_id + '/executions'
         parameters = {
-            'max': CONFIGS['CHUNK_SIZE'],
-            'olderFilter': str(CONFIGS['RECORDS_KEEP_TIME'])
+            'max': CONFIGS.chunk_size,
+            'olderFilter': str(CONFIGS.keep_time)
         }
 
     try:
         response = requests.get(endpoint, params=parameters, headers=HEADERS,
-                                verify=False, timeout=CONFIGS['SEARCH_TIMEOUT'])
+                                verify=False, timeout=CONFIGS.search_timeout)
         if only_ids:
-            _, execution_info = modules.base.parse_json_response(response, 'executions', 'id')
+            status, execution_info = base.parse_json_response(
+                response, 'executions', 'id')
         else:
-            _, execution_info = modules.base.parse_json_response(response, 'executions')
-    except requests.exceptions.RequestException as exception:
-        if CONFIGS['VERBOSE']:
-            print(exception)
-        return None
+            status, execution_info = base.parse_json_response(
+                response, 'executions')
 
-    return execution_info
+        if status:
+            return execution_info
+    except requests.exceptions.RequestException as exception:
+        if CONFIGS.debug:
+            print(exception)
+
+    return False
 
 
 def get_executions_total(identifier, job_filter=True):
     '''Get executions counter by project or job'''
 
-    executions_count = 0
+    status = False
 
     if job_filter:
         endpoint = URL + 'job/' + identifier + '/executions'
@@ -92,21 +105,23 @@ def get_executions_total(identifier, job_filter=True):
         endpoint = URL + 'project/' + identifier + '/executions'
 
     parameters = {
-        'olderFilter': str(CONFIGS['RECORDS_KEEP_TIME']),
+        'olderFilter': str(CONFIGS.keep_time),
         'max': 1
     }
 
     try:
         response = requests.get(endpoint, params=parameters, headers=HEADERS,
-                                verify=False, timeout=CONFIGS['SEARCH_TIMEOUT'])
-        _, executions_paging = modules.base.parse_json_response(response, 'paging')
-        executions_count = executions_paging['total']
-    except requests.exceptions.RequestException as exception:
-        if CONFIGS['VERBOSE']:
-            print(exception)
-        return False
+                                verify=False, timeout=CONFIGS.search_timeout)
+        status, executions_paging = base.parse_json_response(
+            response, 'paging')
 
-    return executions_count
+        if status:
+            return executions_paging['total']
+    except requests.exceptions.RequestException as exception:
+        if CONFIGS.debug:
+            print(exception)
+
+    return False
 
 
 def delete_executions(executions_ids):
@@ -114,112 +129,151 @@ def delete_executions(executions_ids):
 
     endpoint = URL + 'executions/delete'
     data = json.dumps(executions_ids)
+    status = False
 
     try:
         request = requests.post(
-            endpoint, headers=HEADERS, data=data, verify=False, timeout=CONFIGS['DELETE_TIMEOUT'])
-        _, response = modules.base.parse_json_response(request)
+            endpoint, headers=HEADERS, data=data, verify=False, timeout=CONFIGS.delete_timeout)
+        status, response = base.parse_json_response(request)
 
-        if response['allsuccessful']:
-            print("All requested executions were successfully deleted (total of {0})".
-                  format(response['successCount']))
-            return True
-        else:
-            print("Errors on deleting requested executions ({0}/{1} failed)".
-                  format(response['failedCount'], response['requestCount']))
-            return False
+        if status:
+            if response['allsuccessful']:
+                print("All requested executions were successfully deleted (total of {0})".
+                      format(response['successCount']))
+                return True
+            else:
+                print("Errors on deleting requested executions ({0}/{1} failed)".
+                      format(response['failedCount'], response['requestCount']))
+                return False
     except requests.exceptions.RequestException as exception:
-        if CONFIGS['VERBOSE']:
+        if CONFIGS.debug:
             print(exception)
-        return False
+
+    return False
+
+
+def executions_cleanup(project_name=None):
+    '''...'''
+    projects = get_all_projects()
+
+    if not projects:
+        msg = "Error getting projects' listing."
+        return False, msg
+
+    if project_name != None and project_name != "":
+        filter_project = True
+    else:
+        filter_project = False
+
+    for project in projects:
+        page_number = 0
+        total_pages = 0
+
+        if not filter_project or project == project_name:
+            if CONFIGS.executions_by_project:
+                count_execs = get_executions_total(project, False)
+
+                if count_execs > 0:
+                    total_pages = base.get_num_pages(
+                        count_execs, CONFIGS.chunk_size)
+                    print("[{0}]: There are {1} old deletable executions.".format(
+                        project, count_execs))
+                    print("[{0}]: Processing logs deleting in {1} cycles.".format(
+                        project, total_pages))
+                elif count_execs is False:
+                    msg = "[{0}]: Error getting counter of executions".format(
+                        project)
+                    return False, msg
+                elif count_execs == 0:
+                    print(
+                        "[{0}]: There are no deletable executions.".format(project))
+                    continue
+
+                for actual_page in range(page_number, total_pages):
+                    executions = get_executions(project, actual_page, False)
+
+                    if executions:
+                        interval = [actual_page * CONFIGS.chunk_size,
+                                    actual_page * CONFIGS.chunk_size + len(executions)]
+                        print("[{0}]: Deleting range {1} to {2}".format(
+                            project, interval[0], interval[1]))
+                        success = delete_executions(executions)
+
+                        if success:
+                            continue
+                        else:
+                            msg = "[{0}]: Error deleting executions.".format(
+                                project)
+                            return False, msg
+                    else:
+                        msg = "[{0}]: Error getting executions.".format(
+                            project)
+                        return False, msg
+            else:
+                # temporary - do not use this mode
+                jobs = get_jobs_by_project(project)
+                for job in jobs:
+                    count_execs = get_executions_total(job)
+                    total_pages = base.get_num_pages(
+                        count_execs, CONFIGS.chunk_size)
+
+                    if count_execs > 0:
+                        print("[{0}]: There are {1} old deletable executions.".format(
+                            project, count_execs))
+                        print("[{0}]: Processing logs deleting in {1} cycles.".format(
+                            project, total_pages))
+                    else:
+                        print(
+                            "[{0}]: There are no deletable executions.".format(project))
+
+                    for actual_page in range(page_number, total_pages + 1):
+                        executions = get_executions(job, actual_page)
+
+                        if executions:
+                            success = delete_executions(executions)
+                        elif not executions or not success:
+                            break
+
+    return True, ""
 
 
 # Calling main
 if __name__ == "__main__":
-    signal.signal(signal.SIGINT, modules.base.sigint_handler)
+    signal.signal(signal.SIGINT, base.sigint_handler)
 
-    CONFIGS = modules.base.parse_args(
+    # Parse configuration file w/ mandatory parameters to the script
+    CONFIGS = base.parse_args(
         'Listing running jobs and delete old logs from your Rundeck server.')
-    LOGGING = Logger(level=2)
 
-    if not modules.base.validate_keeping_time(CONFIGS['RECORDS_KEEP_TIME']):
-        LOGGING.write_to_log("Invalid parameter \'RECORDS_KEEP_TIME\'. Exiting...")
+    # Validate configuration parameters
+    if not base.validate_configs(CONFIGS):
+        print("Error on passed parameters. Exiting without success...")
         exit(1)
 
-    if CONFIGS['SSL_ENABLED']:
-        proto = 'https'
+    # Set up global variables
+    PROTOCOL = "http"
+    if CONFIGS.ssl_enabled:
+        PROTOCOL = 'https'
         requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-    else:
-        proto = 'http'
 
-    URL = '{0}://{1}:{2}/api/{3}/'.format(
-        proto, CONFIGS["HOST"], CONFIGS["PORT"], CONFIGS["API_VERSION"])
+    URL = '{0}://{1}:{2}/api/{3}/'.format(PROTOCOL,
+                                          CONFIGS.host, CONFIGS.port, CONFIGS.api_version)
     HEADERS = {
         'Content-Type': 'application/json',
-        'X-Rundeck-Auth-Token': CONFIGS['TOKEN'],
+        'X-Rundeck-Auth-Token': CONFIGS.auth,
         'Accept': 'application/json'
     }
 
-    projects = get_all_projects()
+    # Start execution from available modes
+    if CONFIGS.execution_mode == "cleanup":
+        STATUS, ERROR_MSG = executions_cleanup(CONFIGS.filtered_project)
+    elif CONFIGS.execution_mode == "listing":
+        # @todo - implement function to listing executions by project or by each job
+        print("Listing function")
+    else:
+        print("No execution mode matching {0}".format(CONFIGS.execution_mode))
 
-    if projects is None:
-        LOGGING.write_to_log("Error on reading Rundeck projects. Exiting...")
-        exit(1)
+    if not STATUS:
+        print(ERROR_MSG + " Exiting without success...")
 
-    for project in projects:
-        page_number = 0
-
-        if CONFIGS['EXECUTIONS_BY_PROJECT']:
-            count_execs = get_executions_total(project, False)
-
-            if count_execs is None:
-                LOGGING.write_to_log("Error on reading counter of Rundeck executions. Exiting...")
-                exit(1)
-
-            total_pages = modules.base.get_num_pages(
-                count_execs, CONFIGS["CHUNK_SIZE"])
-
-            if count_execs > 0:
-                LOGGING.write_to_log("[" + str(project) + "]: There are " + str(count_execs) +
-                                     " old deletable executions", log_level=2)
-                LOGGING.write_to_log("[" + str(project) + "]: Processing executions deleting in " +
-                                     str(total_pages) + " cycles.", log_level=2)
-            else:
-                LOGGING.write_to_log("[" + str(project) + "]: There are no deletable executions",
-                                     log_level=2)
-
-            for actual_page in range(page_number, total_pages + 1):
-                executions = get_executions(project, actual_page, False)
-
-                if executions is None:
-                    LOGGING.write_to_log("Error on reading Rundeck executions. Exiting...")
-                    exit(1)
-                else:
-                    success = delete_executions(executions)
-        else:
-            jobs = get_jobs_by_project(project)
-            for job in jobs:
-                count_execs = get_executions_total(job)
-                total_pages = modules.base.get_num_pages(
-                    count_execs, CONFIGS["CHUNK_SIZE"])
-
-                if count_execs > 0:
-                    LOGGING.write_to_log("[" + str(project) + "]: There are " + str(count_execs) +
-                                         " old deletable executions", log_level=2)
-                    LOGGING.write_to_log("[" + str(project) + "]: Processing executions deleting in " +
-                                         str(total_pages) + " cycles.", log_level=2)
-                else:
-                    LOGGING.write_to_log("[" + str(project) + "]: There are no deletable executions",
-                                         log_level=2)
-                    break
-
-                for actual_page in range(page_number, total_pages + 1):
-                    executions = get_executions(job, actual_page)
-
-                    if executions:
-                        success = delete_executions(executions)
-                    elif not executions or not success:
-                        break
-
-    exit(0)
-    
+    exit(not STATUS)
