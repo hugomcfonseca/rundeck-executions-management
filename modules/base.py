@@ -2,7 +2,6 @@
 
 import argparse
 import math
-import json
 
 
 def parse_args(message=None):
@@ -11,29 +10,29 @@ def parse_args(message=None):
     parser.add_argument('-a', '--auth', metavar='Token', type=str, required=True,
                         help='Rundeck token')
     parser.add_argument('-t', '--host', metavar='Domain', type=str, default="localhost",
-                        help='Rundeck host or domain')
+                        help='Rundeck host or domain (default: localhost)')
     parser.add_argument('-p', '--port', metavar='Port', type=int, default=4440,
-                        help='Rundeck port')
+                        help='Rundeck port (default: 4440)')
     parser.add_argument('-m', '--execution-mode', metavar='Mode', type=str, default='cleanup',
-                        help='Select operation to run this project')
+                        help='Select operation to run this project (default: cleanup)')
     parser.add_argument('--filtered-project', metavar='Project', type=str, default=None,
                         help='Filter by a given project')
     parser.add_argument('--api-version', metavar='Version', type=int, default=19,
-                        help='Rundeck API version')
+                        help='Rundeck API version (default: 19)')
     parser.add_argument('--search-timeout', metavar='Time', type=int, default=60,
-                        help='Timeout to expire HTTP GET requests')
+                        help='Timeout to expire HTTP GET requests (default: 60)')
     parser.add_argument('--delete-timeout', metavar='Time', type=int, default=300,
-                        help='Timeout to expire HTTP POST requests')
+                        help='Timeout to expire HTTP POST requests (default: 300)')
     parser.add_argument('--keep-time', metavar='Time', type=str, default="30d",
-                        help='Period of time to keep executions records')
+                        help='Period of time to keep executions records (default: 30d)')
     parser.add_argument('--chunk-size', type=int, metavar='Size', default=200,
-                        help='Size of each delete iteration')
+                        help='Size of each delete iteration (default: 200)')
     parser.add_argument('--ssl-enabled', type=bool, metavar='status', default=False,
-                        help='Rundeck is served over SSL')
+                        help='Rundeck is served over SSL (default: false)')
     parser.add_argument('--executions-by-project', type=bool, metavar='status', default=True,
-                        help='Filter executions by project or job')
+                        help='Filter executions by project (default: true)')
     parser.add_argument('--debug', default=False, action='store_true',
-                        help='Used to print executed operations')
+                        help='Print all operations (default: false)')
     args = parser.parse_args()
 
     return args

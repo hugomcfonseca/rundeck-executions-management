@@ -35,7 +35,7 @@ class Logger:
         aux.setFormatter(formatter)
         log.addHandler(aux)
 
-    def write_to_log(self, message, log_level=3):
+    def write(self, message, log_level=3):
         '''...'''
 
         if log_level == 1:

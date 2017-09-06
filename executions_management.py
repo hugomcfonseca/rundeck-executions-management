@@ -1,8 +1,8 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 
 import json
-import requests
 import signal
+import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
 import modules.base as base
@@ -29,7 +29,7 @@ def get_all_projects(only_names=True):
             return project_info
     except requests.exceptions.RequestException as exception:
         if CONFIGS.debug:
-            print(exception)
+            LOG.write(exception)
 
     return False
 
@@ -52,7 +52,7 @@ def get_jobs_by_project(project_name, only_ids=True):
             return job_info
     except requests.exceptions.RequestException as exception:
         if CONFIGS.debug:
-            print(exception)
+            LOG.write(exception)
 
     return False
 
@@ -89,7 +89,7 @@ def get_executions(job_id, page, job_filter=True, only_ids=True):
             return execution_info
     except requests.exceptions.RequestException as exception:
         if CONFIGS.debug:
-            print(exception)
+            LOG.write(exception)
 
     return False
 
@@ -119,7 +119,7 @@ def get_executions_total(identifier, job_filter=True):
             return executions_paging['total']
     except requests.exceptions.RequestException as exception:
         if CONFIGS.debug:
-            print(exception)
+            LOG.write(exception)
 
     return False
 
@@ -138,16 +138,16 @@ def delete_executions(executions_ids):
 
         if status:
             if response['allsuccessful']:
-                print("All requested executions were successfully deleted (total of {0})".
-                      format(response['successCount']))
+                LOG.write("All requested executions were successfully deleted (total of {0})".
+                          format(response['successCount']))
                 return True
             else:
-                print("Errors on deleting requested executions ({0}/{1} failed)".
-                      format(response['failedCount'], response['requestCount']))
+                LOG.write("Errors on deleting requested executions ({0}/{1} failed)".
+                          format(response['failedCount'], response['requestCount']))
                 return False
     except requests.exceptions.RequestException as exception:
         if CONFIGS.debug:
-            print(exception)
+            LOG.write(exception)
 
     return False
 
@@ -176,16 +176,16 @@ def executions_cleanup(project_name=None):
                 if count_execs > 0:
                     total_pages = base.get_num_pages(
                         count_execs, CONFIGS.chunk_size)
-                    print("[{0}]: There are {1} old deletable executions.".format(
+                    LOG.write("[{0}]: There are {1} old deletable executions.".format(
                         project, count_execs))
-                    print("[{0}]: Processing logs deleting in {1} cycles.".format(
+                    LOG.write("[{0}]: Processing logs deleting in {1} cycles.".format(
                         project, total_pages))
                 elif count_execs is False:
                     msg = "[{0}]: Error getting counter of executions".format(
                         project)
                     return False, msg
                 elif count_execs == 0:
-                    print(
+                    LOG.write(
                         "[{0}]: There are no deletable executions.".format(project))
                     continue
 
@@ -195,7 +195,7 @@ def executions_cleanup(project_name=None):
                     if executions:
                         interval = [actual_page * CONFIGS.chunk_size,
                                     actual_page * CONFIGS.chunk_size + len(executions)]
-                        print("[{0}]: Deleting range {1} to {2}".format(
+                        LOG.write("[{0}]: Deleting range {1} to {2}".format(
                             project, interval[0], interval[1]))
                         success = delete_executions(executions)
 
@@ -218,12 +218,12 @@ def executions_cleanup(project_name=None):
                         count_execs, CONFIGS.chunk_size)
 
                     if count_execs > 0:
-                        print("[{0}]: There are {1} old deletable executions.".format(
+                        LOG.write("[{0}]: There are {1} old deletable executions.".format(
                             project, count_execs))
-                        print("[{0}]: Processing logs deleting in {1} cycles.".format(
+                        LOG.write("[{0}]: Processing logs deleting in {1} cycles.".format(
                             project, total_pages))
                     else:
-                        print(
+                        LOG.write(
                             "[{0}]: There are no deletable executions.".format(project))
 
                     for actual_page in range(page_number, total_pages + 1):
@@ -241,13 +241,16 @@ def executions_cleanup(project_name=None):
 if __name__ == "__main__":
     signal.signal(signal.SIGINT, base.sigint_handler)
 
+    # Initialization of class objects
+    LOG = Logger(level=2)
+
     # Parse configuration file w/ mandatory parameters to the script
     CONFIGS = base.parse_args(
         'Listing running jobs and delete old logs from your Rundeck server.')
 
     # Validate configuration parameters
     if not base.validate_configs(CONFIGS):
-        print("Error on passed parameters. Exiting without success...")
+        LOG.write("Error on passed parameters. Exiting without success...")
         exit(1)
 
     # Set up global variables
@@ -269,11 +272,12 @@ if __name__ == "__main__":
         STATUS, ERROR_MSG = executions_cleanup(CONFIGS.filtered_project)
     elif CONFIGS.execution_mode == "listing":
         # @todo - implement function to listing executions by project or by each job
-        print("Listing function")
+        LOG.write("Listing function")
     else:
-        print("No execution mode matching {0}".format(CONFIGS.execution_mode))
+        LOG.write("No execution mode matching {0}".format(
+            CONFIGS.execution_mode))
 
     if not STATUS:
-        print(ERROR_MSG + " Exiting without success...")
+        LOG.write(ERROR_MSG + " Exiting without success...")
 
     exit(not STATUS)

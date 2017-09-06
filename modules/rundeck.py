@@ -4,7 +4,7 @@ import json
 import requests
 
 from modules.logger import Logger
-from base import parse_json_response
+from modules.base import parse_json_response
 
 
 class RundeckApi:
