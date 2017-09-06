@@ -27,9 +27,9 @@ def parse_args(message=None):
                         help='Period of time to keep executions records (default: 30d)')
     parser.add_argument('--chunk-size', type=int, metavar='Size', default=200,
                         help='Size of each delete iteration (default: 200)')
-    parser.add_argument('--ssl-enabled', type=bool, metavar='status', default=False,
+    parser.add_argument('--ssl-enabled', action='store_true', default=False,
                         help='Rundeck is served over SSL (default: false)')
-    parser.add_argument('--executions-by-project', type=bool, metavar='status', default=True,
+    parser.add_argument('--executions-by-project', action='store_true', default=True,
                         help='Filter executions by project (default: true)')
     parser.add_argument('--debug', default=False, action='store_true',
                         help='Print all operations (default: false)')
