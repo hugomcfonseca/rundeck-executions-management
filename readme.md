@@ -1,51 +1,38 @@
 # rundeck-executions-cleanup
-Python script to remove old Rundeck executions and log files.
 
-## Getting started
-By default, this script needs at least one of two parameters: a configuration file or a valid token. Others parameters are assumed by default and can be overriden. Next, it is showed all available parameters:
+Python script to execute remote operations on Rundeck. Available operations are: cleanup of old executions (both on database and filesystem) and executions listing.
 
-```
--h, --help                          Show this help message and exit
--c or --config-file file            JSON file with configurations
---host host                         IP address or domain of Rundeck (default: localhost)
---port port                         Port of Rundeck (default: 4440)
---auth token                        API token with correct permissions
---api-version version               API version of Rundeck (default: 19)
---search-time seconds               Time to expire search queries (default: 60)
---delete-time seconds               Time to expire delete queries (default: 1200)
---keeping-days days                 Number of days to keep logs (default: 21)
---delete-size N                     Number of executions to delete by cycle (default: 1000)
---over-ssl                          Used when Rundeck is server over HTTPS (default: no)
---debug                             Used to print executed operations (default: no)
---execs-by-project                  Either delete defined range of executions by jobs or projects (default: no)
-```
+## Getting Started
 
-## Configuration file
-The configuration file must follow JSON format and have, at least, a valid _token_ with write permissions. Next, it is presented its format and all available keys:
+By default, this script needs at least one parameter: a valid token. Others parameters are assumed by default and can be overriden. Next, it is showed all available parameters:
 
-```json
-{
-    "hostname": <rundeck_host>,
-    "port": <rundeck_port>,
-    "token": <rundeck_token>,
-    "api_version": <api_version>,
-    "search_time": <max_time_to_read>,
-    "delete_time": <max_time_to_delete>,
-    "keeping_days": <days_to_keep>,
-    "delete_size": <bulk_size>,
-    "over_ssl": <boolean>,
-    "debug": <boolean>,
-    "execs_by_project": <boolean>
-}
+```sh
+  -h, --help                        Show this help message and exit
+  -a Token, --auth Token            Rundeck token
+  -t Domain, --host Domain          Rundeck host or domain (default: localhost)
+  -p Port, --port Port              Rundeck port (default: 4440)
+  -m Mode, --execution-mode Mode    Select operation to run this project (default: cleanup)
+  --filtered-project Project        Filter by a given project
+  --api-version Version             Rundeck API version (default: 19)
+  --search-timeout Time             Timeout to expire HTTP GET requests (default: 60)
+  --delete-timeout Time             Timeout to expire HTTP POST requests (default: 300)
+  --keep-time Time                  Period of time to keep executions records (default: 30d)
+  --chunk-size Size                 Size of each delete iteration (default: 200)
+  --ssl-enabled status              Rundeck is served over SSL (default: false)
+  --executions-by-project status    Filter executions by project (default: true)
+  --debug                           Print all operations (default: false)
 ```
 
 ## Usage
-**Executing script with a configuration file:**
-```
-$ python RundeckExecutionsCleanup.py -c my_confs.json
+
+### **#1:** Cleanup old records with default arguments' values (local Rundeck server)
+
+```sh
+$ python executions_management.py --auth YOUR_TOKEN
 ```
 
-**Execution script without a configuration file and assuming all default values are correct:**
-```
-$ python RundeckExecutionsCleanup.py --auth-token MYTOKEN
+### **#2:** Cleanup old records in a remote Rundeck server (available over SSL)
+
+```sh
+$ python executions_management.py --auth-token YOUR_TOKEN --host rundeck.domain.com --port 443 --ssl-enabled
 ```
