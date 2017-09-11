@@ -57,7 +57,7 @@ def get_jobs_by_project(project_name, only_ids=True):
     return False
 
 
-def get_executions(job_id, page, job_filter=True, only_ids=True):
+def get_executions(job_id, page, job_filter=True, only_ids=True, only_running=False):
     '''Get executions older than a given number of days by job or project '''
 
     status = False
@@ -74,6 +74,9 @@ def get_executions(job_id, page, job_filter=True, only_ids=True):
             'max': CONFIGS.chunk_size,
             'olderFilter': str(CONFIGS.keep_time)
         }
+
+    if only_running:
+        endpoint = endpoint + "/running"
 
     try:
         response = requests.get(endpoint, params=parameters, headers=HEADERS,
@@ -237,6 +240,29 @@ def executions_cleanup(project_name=None):
     return True, ""
 
 
+def listing_executions(project=None, job=None, only_running=False):
+    '''...'''
+
+    filter_by_project = False
+    filter_by_jobname = False
+    
+    if project != None:
+        projects = project
+    else:
+        projects = get_all_projects()
+
+    if job != None:
+        filter_by_jobname = True
+
+    for proj in projects:
+        if only_running:
+            executions = get_executions(proj, 0, False, False, True)
+
+        print(json.dumps(executions))
+
+    return True, ""
+
+
 # Calling main
 if __name__ == "__main__":
     signal.signal(signal.SIGINT, base.sigint_handler)
@@ -272,6 +298,7 @@ if __name__ == "__main__":
         STATUS, ERROR_MSG = executions_cleanup(CONFIGS.filtered_project)
     elif CONFIGS.execution_mode == "listing":
         # @todo - implement function to listing executions by project or by each job
+        STATUS, ERROR_MSG = listing_executions(CONFIGS.filtered_project, None, True)
         LOG.write("Listing function")
     else:
         LOG.write("No execution mode matching {0}".format(
