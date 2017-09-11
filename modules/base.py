@@ -1,12 +1,12 @@
 #!/usr/bin/python
 
-import argparse
-import math
+from argparse import ArgumentParser
+from math import ceil
 
 
 def parse_args(message=None):
     '''Initialization of global variables'''
-    parser = argparse.ArgumentParser(description=message)
+    parser = ArgumentParser(description=message)
     parser.add_argument('-a', '--auth', metavar='Token', type=str, required=True,
                         help='Rundeck token')
     parser.add_argument('-t', '--host', metavar='Domain', type=str, default="localhost",
@@ -16,7 +16,9 @@ def parse_args(message=None):
     parser.add_argument('-m', '--execution-mode', metavar='Mode', type=str, default='cleanup',
                         help='Select operation to run this project (default: cleanup)')
     parser.add_argument('--filtered-project', metavar='Project', type=str, default=None,
-                        help='Filter by a given project')
+                        help='Filter by a given project name')
+    parser.add_argument('--filtered-job', metavar='Job', type=str, default=None,
+                        help='Filter by a given job name')
     parser.add_argument('--api-version', metavar='Version', type=int, default=19,
                         help='Rundeck API version (default: 19)')
     parser.add_argument('--search-timeout', metavar='Time', type=int, default=60,
@@ -31,6 +33,8 @@ def parse_args(message=None):
                         help='Rundeck is served over SSL (default: false)')
     parser.add_argument('--executions-by-project', action='store_true', default=True,
                         help='Filter executions by project (default: true)')
+    parser.add_argument('--only-running', action='store_true', default=False,
+                        help='Filter executions by project (default: False)')
     parser.add_argument('--debug', default=False, action='store_true',
                         help='Print all operations (default: false)')
     args = parser.parse_args()
@@ -41,7 +45,7 @@ def parse_args(message=None):
 def get_num_pages(n_executions, divider=200):
     '''...'''
 
-    return int(math.ceil(n_executions / float(divider)))
+    return int(ceil(n_executions / float(divider)))
 
 
 def validate_configs(configs):

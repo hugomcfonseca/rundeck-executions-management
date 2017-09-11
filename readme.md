@@ -1,4 +1,4 @@
-# rundeck-executions-cleanup
+# rundeck-executions-management
 
 Python script to execute remote operations on Rundeck. Available operations are: cleanup of old executions (both on database and filesystem) and executions listing.
 
@@ -35,4 +35,16 @@ $ python executions_management.py --auth YOUR_TOKEN
 
 ```sh
 $ python executions_management.py --auth-token YOUR_TOKEN --host rundeck.domain.com --port 443 --ssl-enabled
+```
+
+### **#3:** Listing running executions on all projects (local Rundeck server)
+
+```sh
+$ python executions_management.py --auth YOUR_TOKEN --mode listing --only-running
+```
+
+### **#4:** Listing executions on by project and job name older than a given time amount (local Rundeck server)
+
+```sh
+$ python executions_management.py --auth YOUR_TOKEN --mode listing --filtered-project PROJECT_NAME --filtered-job JOB_NAME --keep-time TIME
 ```

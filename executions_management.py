@@ -1,9 +1,8 @@
 #!/usr/bin/python
 
-import json
-import signal
-import requests
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
+from json import dumps
+from signal import signal, SIGINT
+from requests import get, post, exceptions
 
 import modules.base as base
 from modules.logger import Logger
@@ -17,8 +16,8 @@ def get_all_projects(only_names=True):
     status = False
 
     try:
-        response = requests.get(endpoint, headers=HEADERS,
-                                verify=False, timeout=CONFIGS.search_timeout)
+        response = get(endpoint, headers=HEADERS,
+                       verify=False, timeout=CONFIGS.search_timeout)
         if only_names:
             status, project_info = base.parse_json_response(
                 response, None, 'name')
@@ -27,7 +26,7 @@ def get_all_projects(only_names=True):
 
         if status:
             return project_info
-    except requests.exceptions.RequestException as exception:
+    except exceptions.RequestException as exception:
         if CONFIGS.debug:
             LOG.write(exception)
 
@@ -41,8 +40,8 @@ def get_jobs_by_project(project_name, only_ids=True):
     status = False
 
     try:
-        response = requests.get(endpoint, headers=HEADERS,
-                                verify=False, timeout=CONFIGS.search_timeout)
+        response = get(endpoint, headers=HEADERS,
+                       verify=False, timeout=CONFIGS.search_timeout)
         if only_ids:
             status, job_info = base.parse_json_response(response, None, 'id')
         else:
@@ -50,7 +49,7 @@ def get_jobs_by_project(project_name, only_ids=True):
 
         if status:
             return job_info
-    except requests.exceptions.RequestException as exception:
+    except exceptions.RequestException as exception:
         if CONFIGS.debug:
             LOG.write(exception)
 
@@ -79,8 +78,8 @@ def get_executions(job_id, page, job_filter=True, only_ids=True, only_running=Fa
         endpoint = endpoint + "/running"
 
     try:
-        response = requests.get(endpoint, params=parameters, headers=HEADERS,
-                                verify=False, timeout=CONFIGS.search_timeout)
+        response = get(endpoint, params=parameters, headers=HEADERS,
+                       verify=False, timeout=CONFIGS.search_timeout)
         if only_ids:
             status, execution_info = base.parse_json_response(
                 response, 'executions', 'id')
@@ -90,7 +89,7 @@ def get_executions(job_id, page, job_filter=True, only_ids=True, only_running=Fa
 
         if status:
             return execution_info
-    except requests.exceptions.RequestException as exception:
+    except exceptions.RequestException as exception:
         if CONFIGS.debug:
             LOG.write(exception)
 
@@ -113,14 +112,14 @@ def get_executions_total(identifier, job_filter=True):
     }
 
     try:
-        response = requests.get(endpoint, params=parameters, headers=HEADERS,
-                                verify=False, timeout=CONFIGS.search_timeout)
+        response = get(endpoint, params=parameters, headers=HEADERS,
+                       verify=False, timeout=CONFIGS.search_timeout)
         status, executions_paging = base.parse_json_response(
             response, 'paging')
 
         if status:
             return executions_paging['total']
-    except requests.exceptions.RequestException as exception:
+    except exceptions.RequestException as exception:
         if CONFIGS.debug:
             LOG.write(exception)
 
@@ -131,11 +130,11 @@ def delete_executions(executions_ids):
     '''Bulk deletions of Rundeck executions'''
 
     endpoint = URL + 'executions/delete'
-    data = json.dumps(executions_ids)
+    data = dumps(executions_ids)
     status = False
 
     try:
-        request = requests.post(
+        request = post(
             endpoint, headers=HEADERS, data=data, verify=False, timeout=CONFIGS.delete_timeout)
         status, response = base.parse_json_response(request)
 
@@ -148,7 +147,7 @@ def delete_executions(executions_ids):
                 LOG.write("Errors on deleting requested executions ({0}/{1} failed)".
                           format(response['failedCount'], response['requestCount']))
                 return False
-    except requests.exceptions.RequestException as exception:
+    except exceptions.RequestException as exception:
         if CONFIGS.debug:
             LOG.write(exception)
 
@@ -243,9 +242,8 @@ def executions_cleanup(project_name=None):
 def listing_executions(project=None, job=None, only_running=False):
     '''...'''
 
-    filter_by_project = False
     filter_by_jobname = False
-    
+
     if project != None:
         projects = project
     else:
@@ -257,15 +255,28 @@ def listing_executions(project=None, job=None, only_running=False):
     for proj in projects:
         if only_running:
             executions = get_executions(proj, 0, False, False, True)
+        else:
+            executions = get_executions(proj, 0, False, False)
 
-        print(json.dumps(executions))
+        if executions is False:
+            err_msg = "[{0}] Error getting executions.".format(proj)
+            return False, err_msg
+
+        for execution in executions:
+            if filter_by_jobname:
+                if execution['job']['name'] == job:
+                    LOG.write("[{0}] - Job \"{1}\" is {2}".format(execution['project'],
+                                                                   execution['job']['name'], execution['status']))
+            else:
+                LOG.write("[{0}] - Job \"{1}\" is {2}".format(execution['project'],
+                                                           execution['job']['name'], execution['status']))
 
     return True, ""
 
 
 # Calling main
 if __name__ == "__main__":
-    signal.signal(signal.SIGINT, base.sigint_handler)
+    signal(SIGINT, base.sigint_handler)
 
     # Initialization of class objects
     LOG = Logger(level=2)
@@ -283,7 +294,6 @@ if __name__ == "__main__":
     PROTOCOL = "http"
     if CONFIGS.ssl_enabled:
         PROTOCOL = 'https'
-        requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
     URL = '{0}://{1}:{2}/api/{3}/'.format(PROTOCOL,
                                           CONFIGS.host, CONFIGS.port, CONFIGS.api_version)
@@ -297,9 +307,8 @@ if __name__ == "__main__":
     if CONFIGS.execution_mode == "cleanup":
         STATUS, ERROR_MSG = executions_cleanup(CONFIGS.filtered_project)
     elif CONFIGS.execution_mode == "listing":
-        # @todo - implement function to listing executions by project or by each job
-        STATUS, ERROR_MSG = listing_executions(CONFIGS.filtered_project, None, True)
-        LOG.write("Listing function")
+        STATUS, ERROR_MSG = listing_executions(
+            CONFIGS.filtered_project, CONFIGS.filtered_job, CONFIGS.only_running)
     else:
         LOG.write("No execution mode matching {0}".format(
             CONFIGS.execution_mode))
