@@ -157,6 +157,7 @@ def delete_executions(executions_ids):
 def executions_cleanup(project_name=None):
     '''...'''
     projects = get_all_projects()
+    cleaned_executions = 0
 
     if not projects:
         msg = "Error getting projects' listing."
@@ -182,6 +183,7 @@ def executions_cleanup(project_name=None):
                         project, count_execs))
                     LOG.write("[{0}]: Processing logs deleting in {1} cycles.".format(
                         project, total_pages))
+                    cleaned_executions = cleaned_executions + count_execs
                 elif count_execs is False:
                     msg = "[{0}]: Error getting counter of executions".format(
                         project)
@@ -236,6 +238,9 @@ def executions_cleanup(project_name=None):
                         elif not executions or not success:
                             break
 
+    LOG.write("Statistics: {0} old executions deleted.".format(
+        cleaned_executions))
+
     return True, ""
 
 
@@ -266,10 +271,10 @@ def listing_executions(project=None, job=None, only_running=False):
             if filter_by_jobname:
                 if execution['job']['name'] == job:
                     LOG.write("[{0}] - Job \"{1}\" is {2}".format(execution['project'],
-                                                                   execution['job']['name'], execution['status']))
+                                                                  execution['job']['name'], execution['status']))
             else:
                 LOG.write("[{0}] - Job \"{1}\" is {2}".format(execution['project'],
-                                                           execution['job']['name'], execution['status']))
+                                                              execution['job']['name'], execution['status']))
 
     return True, ""
 
