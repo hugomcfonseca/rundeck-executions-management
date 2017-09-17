@@ -14,9 +14,11 @@ By default, this script needs at least one parameter: a valid token. Others para
   -m Mode, --execution-mode Mode    Select operation to run this project (default: cleanup)
   --filtered-project Project        Filter by a given project
   --api-version Version             Rundeck API version (default: 19)
-  --search-timeout Time             Timeout to expire HTTP GET requests (default: 60)
-  --delete-timeout Time             Timeout to expire HTTP POST requests (default: 300)
+  --search-timeout Seconds          Timeout to expire HTTP GET requests (default: 60)
+  --delete-timeout Seconds          Timeout to expire HTTP POST requests (default: 300)
   --keep-time Time                  Period of time to keep executions records (default: 30d)
+  --retries Number                  Number of retries when some error occur (default: 5)
+  --retry-delay Seconds             Delay to start next retry (default: 5)
   --chunk-size Size                 Size of each delete iteration (default: 200)
   --ssl-enabled status              Rundeck is served over SSL (default: false)
   --executions-by-project status    Filter executions by project (default: true)

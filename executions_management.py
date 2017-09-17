@@ -2,6 +2,7 @@
 
 from json import dumps
 from signal import signal, SIGINT
+from time import sleep
 from requests import get, post, exceptions
 
 import modules.base as base
@@ -194,6 +195,7 @@ def executions_cleanup(project_name=None):
                     continue
 
                 for actual_page in range(page_number, total_pages):
+                    retries = 0
                     executions = get_executions(project, actual_page, False)
 
                     if executions:
@@ -201,14 +203,21 @@ def executions_cleanup(project_name=None):
                                     actual_page * CONFIGS.chunk_size + len(executions)]
                         LOG.write("[{0}]: Deleting range {1} to {2}".format(
                             project, interval[0], interval[1]))
-                        success = delete_executions(executions)
+                        for retry in range(0, CONFIGS.retries):
+                            retries = retry + 1
+                            success = delete_executions(executions)
 
-                        if success:
-                            continue
-                        else:
-                            msg = "[{0}]: Error deleting executions.".format(
-                                project)
-                            return False, msg
+                            if success:
+                                break
+                            elif not success and retries <= CONFIGS.retries:
+                                LOG.write("[{0}] #{1} try not success. Trying again in {2} seconds...".format(
+                                    project, retries, CONFIGS.retry_delay))
+                                sleep(CONFIGS.retry_delay)
+                                continue
+                            else:
+                                msg = "[{0}]: Error deleting executions.".format(
+                                    project)
+                                return False, msg
                     else:
                         msg = "[{0}]: Error getting executions.".format(
                             project)

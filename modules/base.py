@@ -21,14 +21,18 @@ def parse_args(message=None):
                         help='Filter by a given job name')
     parser.add_argument('--api-version', metavar='Version', type=int, default=19,
                         help='Rundeck API version (default: 19)')
-    parser.add_argument('--search-timeout', metavar='Time', type=int, default=60,
+    parser.add_argument('--search-timeout', metavar='Seconds', type=int, default=60,
                         help='Timeout to expire HTTP GET requests (default: 60)')
-    parser.add_argument('--delete-timeout', metavar='Time', type=int, default=300,
+    parser.add_argument('--delete-timeout', metavar='Seconds', type=int, default=300,
                         help='Timeout to expire HTTP POST requests (default: 300)')
     parser.add_argument('--keep-time', metavar='Time', type=str, default="30d",
                         help='Period of time to keep executions records (default: 30d)')
     parser.add_argument('--chunk-size', type=int, metavar='Size', default=200,
                         help='Size of each delete iteration (default: 200)')
+    parser.add_argument('--retries', type=int, metavar='Number', default=5,
+                        help='Number of retries when some error occur (default: 5)')
+    parser.add_argument('--retry-delay', type=int, metavar='Seconds', default=5,
+                        help='Delay to start next retry (default: 5)')
     parser.add_argument('--ssl-enabled', action='store_true', default=False,
                         help='Rundeck is served over SSL (default: false)')
     parser.add_argument('--executions-by-project', action='store_true', default=True,
