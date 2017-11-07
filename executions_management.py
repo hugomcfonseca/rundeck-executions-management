@@ -1,7 +1,10 @@
 #!/usr/bin/python
 
 from json import dumps
+from os import environ
 from signal import signal, SIGINT
+from time import sleep
+from mysql.connector import errorcode, connect, Error
 from requests import get, post, exceptions
 
 import modules.base as base
@@ -126,6 +129,55 @@ def get_executions_total(identifier, job_filter=True):
     return False
 
 
+def get_workflow_ids(executions_ids):
+    '''...'''
+    # Convert execution list to a comma-separated string
+    executions_ids = ",".join(map(str, executions_ids))
+    workflow_ids = ""
+    workflow_step_ids = ""
+
+    # Set up MySQL client
+    try:
+        cnx = connect(user=RUNDECK_DB_USER, password=RUNDECK_DB_PASS,
+                      host=RUNDECK_DB_HOST, database=RUNDECK_DB_NAME,
+                      port=RUNDECK_DB_PORT)
+        mysql_client = cnx.cursor()
+    except Error as err:
+        if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
+            msg = "Something is wrong with your user name or password"
+        elif err.errno == errorcode.ER_BAD_DB_ERROR:
+            msg = "Database does not exist"
+        else:
+            msg = err
+        return False, msg
+
+    # Return workflow IDs
+    workflow_stmt = "SELECT workflow_id FROM execution WHERE id IN ({0})".format(
+        executions_ids)
+    mysql_client.execute(workflow_stmt)
+
+    for workflow_id in mysql_client:
+        workflow_ids = workflow_ids + "," + str(workflow_id[0])
+
+    workflow_ids = workflow_ids.strip(',')
+
+    # Return workflow step IDs
+    if workflow_ids:
+        workflow_step_stmt = "SELECT workflow_step_id FROM workflow_workflow_step WHERE workflow_commands_id IN ({0})".format(
+            workflow_ids)
+        mysql_client.execute(workflow_step_stmt)
+
+        for workflow_step_id in mysql_client:
+            workflow_step_ids = workflow_step_ids + "," + str(workflow_step_id[0])
+
+        workflow_step_ids = workflow_step_ids.strip(',')
+
+    mysql_client.close()
+    cnx.close()
+
+    return workflow_ids, workflow_step_ids, ""
+
+
 def delete_executions(executions_ids):
     '''Bulk deletions of Rundeck executions'''
 
@@ -152,6 +204,43 @@ def delete_executions(executions_ids):
             LOG.write(exception)
 
     return False
+
+
+def delete_workflows(workflow_ids, workflow_step_ids):
+    '''...'''
+
+    # Set up MySQL client
+    try:
+        cnx = connect(user=RUNDECK_DB_USER, password=RUNDECK_DB_PASS,
+                      host=RUNDECK_DB_HOST, database=RUNDECK_DB_NAME,
+                      port=RUNDECK_DB_PORT)
+        mysql_client = cnx.cursor()
+    except Error as err:
+        if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
+            msg = "Something is wrong with your user name or password"
+        elif err.errno == errorcode.ER_BAD_DB_ERROR:
+            msg = "Database does not exist"
+        else:
+            msg = err
+        return False, msg
+
+    # Prepare statement queries
+    if workflow_ids:
+        workflow_step_delete = "DELETE FROM workflow_step WHERE id IN ({0})".format(
+            workflow_step_ids)
+        mysql_client.execute(workflow_step_delete)
+
+    if workflow_step_ids:
+        workflow_delete = "DELETE FROM workflow WHERE id IN ({0})".format(
+            workflow_ids)
+        mysql_client.execute(workflow_delete)
+
+    cnx.commit()
+
+    mysql_client.close()
+    cnx.close()
+
+    return True
 
 
 def executions_cleanup(project_name=None):
@@ -194,6 +283,7 @@ def executions_cleanup(project_name=None):
                     continue
 
                 for actual_page in range(page_number, total_pages):
+                    retries = 0
                     executions = get_executions(project, actual_page, False)
 
                     if executions:
@@ -201,14 +291,33 @@ def executions_cleanup(project_name=None):
                                     actual_page * CONFIGS.chunk_size + len(executions)]
                         LOG.write("[{0}]: Deleting range {1} to {2}".format(
                             project, interval[0], interval[1]))
-                        success = delete_executions(executions)
+                        for retry in range(0, CONFIGS.retries):
+                            retries = retry + 1
+                            workflows, workflow_steps, err_workflow = get_workflow_ids(executions)
 
-                        if success:
-                            continue
-                        else:
-                            msg = "[{0}]: Error deleting executions.".format(
-                                project)
-                            return False, msg
+                            if not workflows or not workflow_steps:
+                                return False, err_workflow
+
+                            if CONFIGS.debug:
+                                LOG.write(
+                                    "[{0}] Removing following executions -> {1}".format(project, executions))
+                                LOG.write(
+                                    "[{0}] Removing following workflows -> {1}".format(project, workflows))
+
+                            executions_success = delete_executions(executions)
+                            workflow_success = delete_workflows(workflows, workflow_steps)
+
+                            if executions_success and workflow_success:
+                                break
+                            elif not (workflow_success or executions_success) and retries <= CONFIGS.retries:
+                                LOG.write("[{0}] #{1} try not success. Trying again in {2} seconds...".format(
+                                    project, retries, CONFIGS.retry_delay))
+                                sleep(CONFIGS.retry_delay)
+                                continue
+                            else:
+                                msg = "[{0}]: Error deleting executions.".format(
+                                    project)
+                                return False, msg
                     else:
                         msg = "[{0}]: Error getting executions.".format(
                             project)
@@ -293,6 +402,20 @@ if __name__ == "__main__":
     # Validate configuration parameters
     if not base.validate_configs(CONFIGS):
         LOG.write("Error on passed parameters. Exiting without success...")
+        exit(1)
+
+    # Set up global variables
+    RUNDECK_DB_HOST = environ['DATASOURCE_HOST'] if 'DATASOURCE_HOST' in environ else CONFIGS.db_host
+    RUNDECK_DB_NAME = environ['DATASOURCE_DBNAME'] if 'DATASOURCE_DBNAME' in environ else CONFIGS.db_name
+    RUNDECK_DB_USER = environ['DATASOURCE_USER'] if 'DATASOURCE_USER' in environ else CONFIGS.db_user
+    RUNDECK_DB_PORT = CONFIGS.db_port
+
+    if 'DATASOURCE_PASSWORD' in environ:
+        RUNDECK_DB_PASS = environ['DATASOURCE_PASSWORD']
+    elif CONFIGS.db_pass != "" and not 'DATASOURCE_PASSWORD' in environ:
+        RUNDECK_DB_PASS = CONFIGS.db_pass
+    else:
+        print("Missing database password.")
         exit(1)
 
     # Set up global variables

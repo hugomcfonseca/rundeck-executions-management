@@ -1,6 +1,8 @@
 # rundeck-executions-management
 
-Python script to execute remote operations on Rundeck. Available operations are: cleanup of old executions (both on database and filesystem) and executions listing.
+Python script to remove old Rundeck executions and log files. Altought, due with Rundeck API only does clean up of `base_report` and `execution1` tables, it was implemented cleanup of missing data from other tables of Rundeck database - `workflow`, `workflow_step` and `workflow_workflow_step`.
+
+Also, it was implemented a feature to list Rundeck executions.
 
 ## Getting Started
 
@@ -12,14 +14,21 @@ By default, this script needs at least one parameter: a valid token. Others para
   -t Domain, --host Domain          Rundeck host or domain (default: localhost)
   -p Port, --port Port              Rundeck port (default: 4440)
   -m Mode, --execution-mode Mode    Select operation to run this project (default: cleanup)
+  --db-host Host                    Rundeck database host (default: mysql-host)
+  --db-port Port                    Rundeck database port (default: 3306)
+  --db-name Database                Rundeck database name (default: rundeck)
+  --db-user User                    Rundeck database user (default: rundeck)
+  --db-pass Password                Rundeck database password
   --filtered-project Project        Filter by a given project
   --api-version Version             Rundeck API version (default: 19)
-  --search-timeout Time             Timeout to expire HTTP GET requests (default: 60)
-  --delete-timeout Time             Timeout to expire HTTP POST requests (default: 300)
+  --search-timeout Seconds          Timeout to expire HTTP GET requests (default: 60)
+  --delete-timeout Seconds          Timeout to expire HTTP POST requests (default: 300)
   --keep-time Time                  Period of time to keep executions records (default: 30d)
   --chunk-size Size                 Size of each delete iteration (default: 200)
-  --ssl-enabled status              Rundeck is served over SSL (default: false)
-  --executions-by-project status    Filter executions by project (default: true)
+  --retries Number                  Number of retries when some error occur (default: 5)
+  --retry-delay Seconds             Delay to start next retry (default: 5)
+  --ssl-enabled                     Rundeck is served over SSL (default: false)
+  --executions-by-project           Filter executions by project (default: true)
   --debug                           Print all operations (default: false)
 ```
 
