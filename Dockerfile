@@ -4,8 +4,8 @@ LABEL maintainer="Hugo Fonseca <https://github.com/hugomcfonseca>"
 
 ENV \
     PKGS="python py-requests" \
-    DEPS="curl mysql-dev gnupg file gcc python-dev musl-dev g++" \
-    MYSQL_CONN_VERSION="2.1.7" \
+    DEPS="curl mysql-dev gnupg file gcc python-dev py-pip musl-dev g++" \
+    MYSQL_CONN_VERSION="2.0.5" \
     \
     RD_TOKEN="" \
     RD_HOST="localhost" \
@@ -30,14 +30,10 @@ ENV \
 COPY app/ /app
 
 RUN \
-    apk add --update --no-cache ${PY_PKGS} && \
+    apk add --update --no-cache ${PKGS} && \
     apk add --update --no-cache --virtual .deps ${DEPS} && \
-    curl -sSL http://dev.mysql.com/get/Downloads/Connector-Python/mysql-connector-python-${MYSQL_CONN_VERSION}.tar.gz -o /tmp/mysql-connector-python-${MYSQL_CONN_VERSION}.tar.gz && \
-    tar xfz /tmp/mysql-connector-python-${MYSQL_CONN_VERSION}.tar.gz -C /tmp && \
-    cd /tmp/mysql-connector-python-${MYSQL_CONN_VERSION} && \
-    python /tmp/mysql-connector-python-${MYSQL_CONN_VERSION}/setup.py install --with-mysql-capi=$(which mysql_config) && \
-    cd - && \
-    rm -rf /tmp/mysql-connector-python-${MYSQL_CONN_VERSION}* && \
+    pip install -U pip && \
+    pip install http://dev.mysql.com/get/Downloads/Connector-Python/mysql-connector-python-${MYSQL_CONN_VERSION}.tar.gz && \
     chmod +x /app/run.sh && \
     apk del .deps && rm -rf /var/cache/apk/* /tmp/* /var/tmp/*
 
