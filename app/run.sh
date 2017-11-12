@@ -1,5 +1,14 @@
 #!/bin/sh
 
+LOCK="/tmp/.lock.rundeck"
+
+if [ ! -f ${LOCK} ]; then 
+    touch ${LOCK}
+else
+    echo "Cleanup already running..."
+    exit 0
+fi
+
 OPTS_PARAMS="" 
 
 if [[ $DEBUG = true ]]; then 
@@ -10,7 +19,7 @@ if [[ $RD_SSL = true ]]; then
     OPTS_PARAMS="$OPTS_PARAMS --ssl-enabled"
 fi
 
-exec python /app/executions_management.py \
+python /app/executions_management.py \
         --auth "${RD_TOKEN}" \
         --host "${RD_HOST}" \
         --port ${RD_PORT} \
@@ -29,3 +38,5 @@ exec python /app/executions_management.py \
         --retries ${RETRY_TIMES} \
         --retry-delay ${RETRY_BACKOFF} \
         ${OPTS_PARAMS}
+
+rm ${LOCK}

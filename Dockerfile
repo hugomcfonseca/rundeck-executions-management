@@ -35,9 +35,11 @@ RUN \
     pip install -U pip && \
     pip install http://dev.mysql.com/get/Downloads/Connector-Python/mysql-connector-python-${MYSQL_CONN_VERSION}.tar.gz && \
     chmod +x /app/run.sh && \
+    mkdir -p /etc/periodic/midnight && \
+    echo "*       0       *       *       *       run-parts /etc/periodic/midnight >> 2>&1 | tee /var/log/rundeck_cleanup.log" >> /etc/crontabs/root && \
+    cp /app/run.sh /etc/periodic/midnight/rundeck-cleanup && \
     apk del .deps && rm -rf /var/cache/apk/* /tmp/* /var/tmp/*
 
 WORKDIR /app
 
-CMD \
-    /bin/sh /app/run.sh
+CMD exec crond -f
