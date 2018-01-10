@@ -41,11 +41,13 @@ def parse_args(message=None):
                         help='Number of retries when some error occur (default: 5)')
     parser.add_argument('--retry-delay', type=int, metavar='Seconds', default=5,
                         help='Delay to start next retry (default: 5)')
-    parser.add_argument('--ssl-enabled', action='store_true', default=False,
+    parser.add_argument('--ssl-enabled', action='store_true',
                         help='Rundeck is served over SSL (default: false)')
-    parser.add_argument('--executions-by-project', action='store_true', default=True,
+    parser.add_argument('--executions-by-project', action='store_false',
                         help='Filter executions by project (default: true)')
-    parser.add_argument('--debug', default=False, action='store_true',
+    parser.add_argument('--unoptimized', action='store_true',
+                        help='Run all operations in workflow tables (default: false)')
+    parser.add_argument('--debug', action='store_true',
                         help='Print all operations (default: false)')
     args = parser.parse_args()
 

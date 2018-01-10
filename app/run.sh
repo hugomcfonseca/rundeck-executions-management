@@ -19,6 +19,10 @@ if [[ $RD_SSL = true ]]; then
     OPTS_PARAMS="$OPTS_PARAMS --ssl-enabled"
 fi
 
+if [[ $RD_DB_UNOPTIMIZED = true ]]; then
+    OPTS_PARAMS="$OPTS_PARAMS --unoptimized"
+fi
+
 if [ ! -z $RD_PROJECT ]; then 
     OPTS_PARAMS="$OPTS_PARAMS --filtered-project ${RD_PROJECT}"
 fi
