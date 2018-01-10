@@ -225,12 +225,17 @@ def delete_workflows(workflow_ids, workflow_step_ids):
         return False, msg
 
     # Prepare statement queries
-    if workflow_ids:
+    if workflow_ids and CONFIGS.unoptimized:
+        work_workflow_delete = "DELETE FROM workflow_workflow_step WHERE workflow_commands_id IN ({0})".format(
+            workflow_ids)
+        mysql_client.execute(work_workflow_delete)
+
+    if workflow_step_ids:
         workflow_step_delete = "DELETE FROM workflow_step WHERE id IN ({0})".format(
             workflow_step_ids)
         mysql_client.execute(workflow_step_delete)
 
-    if workflow_step_ids:
+    if workflow_ids:
         workflow_delete = "DELETE FROM workflow WHERE id IN ({0})".format(
             workflow_ids)
         mysql_client.execute(workflow_delete)

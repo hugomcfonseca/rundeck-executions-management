@@ -29,6 +29,7 @@ ENV \
     CHUNK_SIZE='200' \
     DEBUG=false \
     \
+    RD_DB_UNOPTIMIZED=false \
     ONETIME_RUNNING=false \
     SCHEDULE='* 0 * * *'
 
