@@ -7,7 +7,11 @@ from modules.logger import Logger
 
 
 class RundeckApi:
-    '''...'''
+    """
+    This class provides multiple functions to manage projects, jobs or executions from Rundeck.
+
+    To do it so, it uses Rundeck API endpoints, but also a connector to Rundeck database and complements deleting executions' data from workflow tables.
+    """
 
     def __init__(self, token, url, headers, db, chunk_size=200, keep_time='30d', ssl=False, search_time=60, del_time=300):
         '''...'''
