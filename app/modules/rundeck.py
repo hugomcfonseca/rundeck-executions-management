@@ -2,7 +2,6 @@
 
 from json import dumps, loads
 from requests import get, post, exceptions
-
 from modules.logger import Logger
 
 
@@ -112,7 +111,7 @@ class RundeckApi:
         if only_names and status:
             status = True
             data = parse_json_response(response, None, 'name')
-        else if status and not only_names:
+        elif status and not only_names:
             status = True
             data = parse_json_response(response)
         else:
@@ -135,7 +134,7 @@ class RundeckApi:
         if only_ids and status:
             status = True
             data = parse_json_response(response, None, 'id')
-        else if status and not only_ids:
+        elif status and not only_ids:
             status = True
             data = parse_json_response(response)
         else:
@@ -174,7 +173,7 @@ class RundeckApi:
         if only_ids and status:
             status = True
             data = parse_json_response(response, 'executions', 'id')
-        else if status and not only_ids:
+        elif status and not only_ids:
             status = True
             data = parse_json_response(response, 'executions')
         else:
