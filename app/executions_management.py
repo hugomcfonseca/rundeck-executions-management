@@ -1,39 +1,13 @@
 #!/usr/bin/python
 
-from json import dumps
 from os import environ
 from signal import signal, SIGINT
 from time import sleep
-from mysql.connector import errorcode, connect, Error
-from requests import get, post, exceptions
 
 import modules.base as base
+from modules.db import DatabaseConn
 from modules.logger import Logger
-#from modules.rundeck import RundeckApi
-
-
-def get_all_projects(only_names=True):
-    '''Get every project info and returns only their names'''
-
-    endpoint = URL + 'projects'
-    status = False
-
-    try:
-        response = get(endpoint, headers=HEADERS,
-                       verify=False, timeout=CONFIGS.search_timeout)
-        if only_names:
-            status, project_info = base.parse_json_response(
-                response, None, 'name')
-        else:
-            status, project_info = base.parse_json_response(response)
-
-        if status:
-            return project_info
-    except exceptions.RequestException as exception:
-        if CONFIGS.debug:
-            LOG.write(exception)
-
-    return False
+from modules.rundeck import RundeckApi
 
 
 def get_jobs_by_project(project_name, only_ids=True):
@@ -59,208 +33,16 @@ def get_jobs_by_project(project_name, only_ids=True):
     return False
 
 
-def get_executions(job_id, page, job_filter=True, only_ids=True, only_running=False):
-    '''Get executions older than a given number of days by job or project '''
-
-    status = False
-
-    if job_filter:
-        endpoint = URL + 'job/' + job_id + '/executions'
-        parameters = {
-            'max': CONFIGS.chunk_size,
-            'offset': page * CONFIGS.chunk_size,
-        }
-    else:
-        endpoint = URL + 'project/' + job_id + '/executions'
-        parameters = {
-            'max': CONFIGS.chunk_size,
-            'olderFilter': str(CONFIGS.keep_time)
-        }
-
-    if only_running:
-        endpoint = endpoint + "/running"
-
-    try:
-        response = get(endpoint, params=parameters, headers=HEADERS,
-                       verify=False, timeout=CONFIGS.search_timeout)
-        if only_ids:
-            status, execution_info = base.parse_json_response(
-                response, 'executions', 'id')
-        else:
-            status, execution_info = base.parse_json_response(
-                response, 'executions')
-
-        if status:
-            return execution_info
-    except exceptions.RequestException as exception:
-        if CONFIGS.debug:
-            LOG.write(exception)
-
-    return False
-
-
-def get_executions_total(identifier, job_filter=True):
-    '''Get executions counter by project or job'''
-
-    status = False
-
-    if job_filter:
-        endpoint = URL + 'job/' + identifier + '/executions'
-    else:
-        endpoint = URL + 'project/' + identifier + '/executions'
-
-    parameters = {
-        'olderFilter': str(CONFIGS.keep_time),
-        'max': 1
-    }
-
-    try:
-        response = get(endpoint, params=parameters, headers=HEADERS,
-                       verify=False, timeout=CONFIGS.search_timeout)
-        status, executions_paging = base.parse_json_response(
-            response, 'paging')
-
-        if status:
-            return executions_paging['total']
-    except exceptions.RequestException as exception:
-        if CONFIGS.debug:
-            LOG.write(exception)
-
-    return False
-
-
-def get_workflow_ids(executions_ids):
-    '''...'''
-    # Convert execution list to a comma-separated string
-    executions_ids = ",".join(map(str, executions_ids))
-    workflow_ids = ""
-    workflow_step_ids = ""
-
-    # Set up MySQL client
-    try:
-        cnx = connect(user=RUNDECK_DB_USER, password=RUNDECK_DB_PASS,
-                      host=RUNDECK_DB_HOST, database=RUNDECK_DB_NAME,
-                      port=RUNDECK_DB_PORT)
-        mysql_client = cnx.cursor()
-    except Error as err:
-        if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
-            msg = "Something is wrong with your user name or password"
-        elif err.errno == errorcode.ER_BAD_DB_ERROR:
-            msg = "Database does not exist"
-        else:
-            msg = err
-        return False, msg
-
-    # Return workflow IDs
-    workflow_stmt = "SELECT workflow_id FROM execution WHERE id IN ({0})".format(
-        executions_ids)
-    mysql_client.execute(workflow_stmt)
-
-    for workflow_id in mysql_client:
-        workflow_ids = workflow_ids + "," + str(workflow_id[0])
-
-    workflow_ids = workflow_ids.strip(',')
-
-    # Return workflow step IDs
-    if workflow_ids:
-        workflow_step_stmt = "SELECT workflow_step_id FROM workflow_workflow_step WHERE workflow_commands_id IN ({0})".format(
-            workflow_ids)
-        mysql_client.execute(workflow_step_stmt)
-
-        for workflow_step_id in mysql_client:
-            workflow_step_ids = workflow_step_ids + "," + str(workflow_step_id[0])
-
-        workflow_step_ids = workflow_step_ids.strip(',')
-
-    mysql_client.close()
-    cnx.close()
-
-    return workflow_ids, workflow_step_ids, ""
-
-
-def delete_executions(executions_ids):
-    '''Bulk deletions of Rundeck executions'''
-
-    endpoint = URL + 'executions/delete'
-    data = dumps(executions_ids)
-    status = False
-
-    try:
-        request = post(
-            endpoint, headers=HEADERS, data=data, verify=False, timeout=CONFIGS.delete_timeout)
-        status, response = base.parse_json_response(request)
-
-        if status:
-            if response['allsuccessful']:
-                LOG.write("All requested executions were successfully deleted (total of {0})".
-                          format(response['successCount']))
-                return True
-            else:
-                LOG.write("Errors on deleting requested executions ({0}/{1} failed)".
-                          format(response['failedCount'], response['requestCount']))
-                return False
-    except exceptions.RequestException as exception:
-        if CONFIGS.debug:
-            LOG.write(exception)
-
-    return False
-
-
-def delete_workflows(workflow_ids, workflow_step_ids):
-    '''...'''
-
-    # Set up MySQL client
-    try:
-        cnx = connect(user=RUNDECK_DB_USER, password=RUNDECK_DB_PASS,
-                      host=RUNDECK_DB_HOST, database=RUNDECK_DB_NAME,
-                      port=RUNDECK_DB_PORT)
-        mysql_client = cnx.cursor()
-    except Error as err:
-        if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
-            msg = "Something is wrong with your user name or password"
-        elif err.errno == errorcode.ER_BAD_DB_ERROR:
-            msg = "Database does not exist"
-        else:
-            msg = err
-        return False, msg
-
-    # Prepare statement queries
-    if workflow_ids and CONFIGS.unoptimized:
-        work_workflow_delete = "DELETE FROM workflow_workflow_step WHERE workflow_commands_id IN ({0})".format(
-            workflow_ids)
-        mysql_client.execute(work_workflow_delete)
-
-    if workflow_step_ids:
-        workflow_step_delete = "DELETE FROM workflow_step WHERE id IN ({0})".format(
-            workflow_step_ids)
-        mysql_client.execute(workflow_step_delete)
-
-    if workflow_ids:
-        workflow_delete = "DELETE FROM workflow WHERE id IN ({0})".format(
-            workflow_ids)
-        mysql_client.execute(workflow_delete)
-
-    cnx.commit()
-
-    mysql_client.close()
-    cnx.close()
-
-    return True
-
-
 def executions_cleanup(project_name=None):
     '''...'''
-    projects = get_all_projects()
-    cleaned_executions = 0
+    del_executions = 0
+    filter_project = True if project_name else False
 
-    if not projects:
-        msg = "Error getting projects' listing."
+    status, projects = RUNDECK_API.get_projects()
+
+    if not status:
+        msg = 'Error getting projects\' listing.'
         return False, msg
-
-    if project_name != None and project_name != "":
-        filter_project = True
-    else:
-        filter_project = False
 
     for project in projects:
         page_number = 0
@@ -268,94 +50,111 @@ def executions_cleanup(project_name=None):
 
         if not filter_project or project == project_name:
             if CONFIGS.executions_by_project:
-                count_execs = get_executions_total(project, False)
+                status, n_executions = RUNDECK_API.get_total_executions(
+                    project, False)
 
-                if count_execs > 0:
-                    total_pages = base.get_num_pages(
-                        count_execs, CONFIGS.chunk_size)
-                    LOG.write("[{0}]: There are {1} old deletable executions.".format(
-                        project, count_execs))
-                    LOG.write("[{0}]: Processing logs deleting in {1} cycles.".format(
-                        project, total_pages))
-                    cleaned_executions = cleaned_executions + count_execs
-                elif count_execs is False:
-                    msg = "[{0}]: Error getting counter of executions".format(
+                if status:
+                    if n_executions > 0:
+                        total_pages = base.get_num_pages(
+                            n_executions, CONFIGS.chunk_size)
+                        LOG.write('[{0}]: There are {1} old deletable executions.'.format(
+                            project, n_executions))
+                        LOG.write('[{0}]: Processing logs deleting in {1} cycles.'.format(
+                            project, total_pages))
+                        del_executions = del_executions + n_executions
+                    else:
+                        LOG.write(
+                            '[{0}]: There are no deletable executions.'.format(project))
+                        continue
+                else:
+                    msg = '[{0}]: Error getting counter of executions'.format(
                         project)
                     return False, msg
-                elif count_execs == 0:
-                    LOG.write(
-                        "[{0}]: There are no deletable executions.".format(project))
-                    continue
 
                 for actual_page in range(page_number, total_pages):
                     retries = 0
-                    executions = get_executions(project, actual_page, False)
+                    status, executions = RUNDECK_API.get_executions(
+                        project, actual_page, False)
 
-                    if executions:
+                    if status:
                         interval = [actual_page * CONFIGS.chunk_size,
                                     actual_page * CONFIGS.chunk_size + len(executions)]
-                        LOG.write("[{0}]: Deleting range {1} to {2}".format(
+                        LOG.write('[{0}]: Deleting range {1} to {2}'.format(
                             project, interval[0], interval[1]))
                         for retry in range(0, CONFIGS.retries):
                             retries = retry + 1
-                            workflows, workflow_steps, err_workflow = get_workflow_ids(executions)
+                            workflows, workflow_steps, err_workflow = RUNDECK_API.get_workflow_ids(
+                                executions)
 
                             if not workflows or not workflow_steps:
                                 return False, err_workflow
 
                             if CONFIGS.debug:
                                 LOG.write(
-                                    "[{0}] Removing following executions -> {1}".format(project, executions))
+                                    '[{0}] Removing following executions -> {1}'.format(project, executions))
                                 LOG.write(
-                                    "[{0}] Removing following workflows -> {1}".format(project, workflows))
+                                    '[{0}] Removing following workflows -> {1}'.format(project, workflows))
 
-                            executions_success = delete_executions(executions)
-                            workflow_success = delete_workflows(workflows, workflow_steps)
+                            res_exec, msg_exec = RUNDECK_API.delete_executions(
+                                executions)
+                            res_wf, msg_wf = RUNDECK_API.delete_workflows(
+                                workflows, workflow_steps)
 
-                            if executions_success and workflow_success:
+                            if res_exec and res_wf:
                                 break
-                            elif not (workflow_success or executions_success) and retries <= CONFIGS.retries:
-                                LOG.write("[{0}] #{1} try not success. Trying again in {2} seconds...".format(
+                            elif not (res_exec or res_wf) and retries <= CONFIGS.retries:
+                                LOG.write('[{0}] #{1} try not succeded. Trying again in {2} seconds...'.format(
                                     project, retries, CONFIGS.retry_delay))
                                 sleep(CONFIGS.retry_delay)
                                 continue
                             else:
-                                msg = "[{0}]: Error deleting executions.".format(
+                                msg = '[{0}]: Error deleting executions.'.format(
                                     project)
                                 return False, msg
                     else:
-                        msg = "[{0}]: Error getting executions.".format(
+                        msg = '[{0}]: Error getting executions.'.format(
                             project)
                         return False, msg
             else:
                 # temporary - do not use this mode
                 jobs = get_jobs_by_project(project)
                 for job in jobs:
-                    count_execs = get_executions_total(job)
+                    status, n_executions = RUNDECK_API.get_total_executions(
+                        job)
                     total_pages = base.get_num_pages(
-                        count_execs, CONFIGS.chunk_size)
+                        n_executions, CONFIGS.chunk_size)
 
-                    if count_execs > 0:
-                        LOG.write("[{0}]: There are {1} old deletable executions.".format(
-                            project, count_execs))
-                        LOG.write("[{0}]: Processing logs deleting in {1} cycles.".format(
-                            project, total_pages))
+                    if status:
+                        if n_executions > 0:
+                            total_pages = base.get_num_pages(
+                                n_executions, CONFIGS.chunk_size)
+                            LOG.write('[{0}]: There are {1} old deletable executions.'.format(
+                                project, n_executions))
+                            LOG.write('[{0}]: Processing logs deleting in {1} cycles.'.format(
+                                project, total_pages))
+                            del_executions = del_executions + n_executions
+                        else:
+                            LOG.write(
+                                '[{0}]: There are no deletable executions.'.format(project))
+                            continue
                     else:
-                        LOG.write(
-                            "[{0}]: There are no deletable executions.".format(project))
+                        msg = '[{0}]: Error getting counter of executions'.format(
+                            project)
+                        return False, msg
 
                     for actual_page in range(page_number, total_pages + 1):
-                        executions = get_executions(job, actual_page)
+                        executions = RUNDECK_API.get_executions(
+                            job, actual_page)
 
                         if executions:
                             success = delete_executions(executions)
                         elif not executions or not success:
                             break
 
-    LOG.write("Statistics: {0} old executions deleted.".format(
-        cleaned_executions))
+    LOG.write('Statistics: {0} old executions deleted.'.format(
+        del_executions))
 
-    return True, ""
+    return True, ''
 
 
 def listing_executions(project=None, job=None, only_running=False):
@@ -378,23 +177,23 @@ def listing_executions(project=None, job=None, only_running=False):
             executions = get_executions(proj, 0, False, False)
 
         if executions is False:
-            err_msg = "[{0}] Error getting executions.".format(proj)
+            err_msg = '[{0}] Error getting executions.'.format(proj)
             return False, err_msg
 
         for execution in executions:
             if filter_by_jobname:
                 if execution['job']['name'] == job:
-                    LOG.write("[{0}] - Job \"{1}\" is {2}".format(execution['project'],
+                    LOG.write('[{0}] - Job \'{1}\' is {2}'.format(execution['project'],
                                                                   execution['job']['name'], execution['status']))
             else:
-                LOG.write("[{0}] - Job \"{1}\" is {2}".format(execution['project'],
+                LOG.write('[{0}] - Job \'{1}\' is {2}'.format(execution['project'],
                                                               execution['job']['name'], execution['status']))
 
-    return True, ""
+    return True, ''
 
 
 # Calling main
-if __name__ == "__main__":
+if __name__ == '__main__':
     signal(SIGINT, base.sigint_handler)
 
     # Initialization of class objects
@@ -406,7 +205,7 @@ if __name__ == "__main__":
 
     # Validate configuration parameters
     if not base.validate_configs(CONFIGS):
-        LOG.write("Error on passed parameters. Exiting without success...")
+        LOG.write('Error on passed parameters. Exiting without success...')
         exit(1)
 
     # Set up global variables
@@ -417,36 +216,41 @@ if __name__ == "__main__":
 
     if 'DATASOURCE_PASSWORD' in environ:
         RUNDECK_DB_PASS = environ['DATASOURCE_PASSWORD']
-    elif CONFIGS.db_pass != "" and not 'DATASOURCE_PASSWORD' in environ:
+    elif CONFIGS.db_pass != '' and not 'DATASOURCE_PASSWORD' in environ:
         RUNDECK_DB_PASS = CONFIGS.db_pass
     else:
-        print("Missing database password.")
+        print('Missing database password.')
         exit(1)
 
     # Set up global variables
-    PROTOCOL = "http"
+    PROTOCOL = 'http'
     if CONFIGS.ssl_enabled:
         PROTOCOL = 'https'
 
-    URL = '{0}://{1}:{2}/api/{3}/'.format(PROTOCOL,
-                                          CONFIGS.host, CONFIGS.port, CONFIGS.api_version)
+    URL = '{0}://{1}:{2}/api/{3}'.format(PROTOCOL,
+                                         CONFIGS.host, CONFIGS.port, CONFIGS.api_version)
     HEADERS = {
         'Content-Type': 'application/json',
         'X-Rundeck-Auth-Token': CONFIGS.auth,
         'Accept': 'application/json'
     }
 
+    DB_CONNECTOR = DatabaseConn(CONFIGS.db_name, CONFIGS.db_user,
+                                CONFIGS.db_pass, CONFIGS.db_host, CONFIGS.db_port)
+    RUNDECK_API = RundeckApi(URL, HEADERS, DB_CONNECTOR,
+                             CONFIGS.chunk_size, CONFIGS.keep_time, CONFIGS.ssl_enabled)
+
     # Start execution from available modes
-    if CONFIGS.execution_mode == "cleanup":
+    if CONFIGS.execution_mode == 'cleanup':
         STATUS, ERROR_MSG = executions_cleanup(CONFIGS.filtered_project)
-    elif CONFIGS.execution_mode == "listing":
+    elif CONFIGS.execution_mode == 'listing':
         STATUS, ERROR_MSG = listing_executions(
             CONFIGS.filtered_project, CONFIGS.filtered_job, CONFIGS.only_running)
     else:
-        LOG.write("No execution mode matching {0}".format(
+        LOG.write('No execution mode matching {0}'.format(
             CONFIGS.execution_mode))
 
     if not STATUS:
-        LOG.write(ERROR_MSG + " Exiting without success...")
+        LOG.write(ERROR_MSG + ' Exiting without success...')
 
     exit(not STATUS)

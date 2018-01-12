@@ -87,32 +87,6 @@ def validate_configs(configs):
     return True, ""
 
 
-def parse_json_response(http_response, filter_by=None, append_by=None):
-    '''...'''
-    data_info = []
-
-    if http_response.ok:
-        json_response = http_response.json()
-
-        if filter_by:
-            response_filtered = json_response[filter_by]
-        else:
-            response_filtered = json_response
-
-        if isinstance(response_filtered, list):
-            for data in response_filtered:
-                if append_by is not None:
-                    data_info.append(data[append_by])
-                else:
-                    data_info.append(data)
-        else:
-            data_info = response_filtered
-
-        return True, data_info
-
-    return False, http_response.status_code
-
-
 def sigint_handler(signum, frame):
     '''...'''
     try:
