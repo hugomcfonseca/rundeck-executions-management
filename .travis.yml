@@ -9,11 +9,11 @@ script:
   - docker ps -a
 
 after_success:
-  - echo "Build info - Branch -> '$TRAVIS_BRANCH'"
+  - echo "Build info - Branch -> '$TRAVIS_BRANCH' Tag -> '$TRAVIS_TAG'"
   - echo -e "Push Container to Docker Hub"
   - docker login -u=$DOCKER_USERNAME -p=$DOCKER_PASSWORD
   - export REPO=hugomcfonseca/rundeck-executions-cleanup
-  - export TAG=`if [ "$TRAVIS_BRANCH" == "master-docker" ]; then echo "latest"; else echo $TRAVIS_BRANCH ; fi`
+  - export TAG=`if [ "$TRAVIS_BRANCH" == "master-docker" ]; then echo "latest"; else echo $TRAVIS_TAG ; fi`
   - docker build -f Dockerfile -t $REPO:$COMMIT .
   - docker tag $REPO:$COMMIT $REPO:$TAG
   - docker push $REPO
