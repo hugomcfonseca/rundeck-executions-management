@@ -18,10 +18,10 @@ install:
 script:
   - docker images | grep 'rundeck-executions-cleanup'
   - if [[ ${TRAVIS_PULL_REQUEST} = false ]] && [[ $TRAVIS_BRANCH == "master-docker" ]]; then
-      TAG=${TRAVIS_TAG:-"latest"}
+      TAG=${TRAVIS_TAG:-"latest"};
     else
-      TAG=${TRAVIS_PULL_REQUEST_BRANCH}
-    fi
+      TAG=${TRAVIS_PULL_REQUEST_BRANCH};
+    fi;
     export ${TAG}
 
 after_success:
