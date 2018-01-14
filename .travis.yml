@@ -17,20 +17,7 @@ install:
 
 script:
   - docker images | grep 'rundeck-executions-cleanup'
-  - if [[ ${TRAVIS_PULL_REQUEST} = false ]] && [[ $TRAVIS_BRANCH == "master-docker" ]]; then
-      TAG=${TRAVIS_TAG:-"latest"};
-    else
-      TAG=${TRAVIS_PULL_REQUEST_BRANCH};
-    fi;
-    export ${TAG}
+  - ./contrib/travis/tagger.sh
 
 after_success:
-  - echo "Build successfully done."
-    echo "\tBranch name -> '${TRAVIS_BRANCH}'"
-    echo "\tTag -> '${TAG}'"
-
-    echo -e "Push container to Docker Hub"
-    docker login -u=$DOCKER_USERNAME -p=$DOCKER_PASSWORD
-    docker tag $REPO:$COMMIT $REPO:$TAG
-    [ ${TRAVIS_PULL_REQUEST} = false ] && docker push $REPO:$TAG
-    [ "${TAG}" != "latest" ] && [ ${TRAVIS_PULL_REQUEST} = false ] && docker push $REPO
+  - ./contrib/travis/push.sh
