@@ -10,29 +10,6 @@ from modules.logger import Logger
 from modules.rundeck import RundeckApi
 
 
-def get_jobs_by_project(project_name, only_ids=True):
-    '''Get jobs by a given project '''
-
-    endpoint = URL + 'project/' + project_name + '/jobs'
-    status = False
-
-    try:
-        response = get(endpoint, headers=HEADERS,
-                       verify=False, timeout=CONFIGS.search_timeout)
-        if only_ids:
-            status, job_info = base.parse_json_response(response, None, 'id')
-        else:
-            status, job_info = base.parse_json_response(response)
-
-        if status:
-            return job_info
-    except exceptions.RequestException as exception:
-        if CONFIGS.debug:
-            LOG.write(exception)
-
-    return False
-
-
 def executions_cleanup(project_name=None):
     '''...'''
     del_executions = 0
@@ -117,7 +94,7 @@ def executions_cleanup(project_name=None):
                         return False, msg
             else:
                 # temporary - do not use this mode
-                jobs = get_jobs_by_project(project)
+                jobs = RUNDECK_API.get_jobs_by_project(project)
                 for job in jobs:
                     status, n_executions = RUNDECK_API.get_total_executions(
                         job)

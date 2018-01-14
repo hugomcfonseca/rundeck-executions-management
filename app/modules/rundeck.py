@@ -115,7 +115,7 @@ class RundeckApi(object):
             data = response
 
         if not data:
-            data = 'Response is not a JSON'
+            data = 'Error parsing JSON response.'
 
         return status, data
 
@@ -138,7 +138,7 @@ class RundeckApi(object):
             data = response
 
         if not data:
-            data = 'Response is not a JSON'
+            data = 'Error parsing JSON response.'
 
         return status, data
 
@@ -177,7 +177,7 @@ class RundeckApi(object):
             data = response
 
         if not data:
-            data = 'Response is not a JSON'
+            data = 'Error parsing JSON response.'
 
         return status, data
 
@@ -200,7 +200,7 @@ class RundeckApi(object):
             data = self.parse_json_response(response, 'paging', 'total')
         else:
             status = False
-            data = response if data else 'Response is not a JSON'
+            data = response if data else 'Error parsing JSON response.'
 
         return status, data
 
@@ -279,5 +279,34 @@ class RundeckApi(object):
 
         self._db.apply()
         self._db.close()
+
+        return True, ''
+
+    def clean_project_executions(self, project, logger = False):
+        '''Clean executions older than a given time by from a project'''
+        status, total = self.get_total_executions(project, False)
+
+        if not status:
+            msg = "[{0}]: Error returning executions counter.".format(project)
+            return False, msg
+        else:
+            if total > 0:
+                msg = "[{0}]: There are {1} executions to delete.".format(project, total)
+            else:
+                msg = "[{0}]: No executions available for deleting.".format(project)
+                return True, msg
+
+        
+
+        return True, msg
+
+    def clean_executions(self, project=None):
+        '''Clean all executions data older than a given time'''
+        n_cleaned = 0
+        project_filter = True if project else False
+        
+        projects = project if project_filter else self.get_projects()
+
+        
 
         return True, ''

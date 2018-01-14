@@ -7,26 +7,17 @@ import sys
 class Logger(object):
     '''...'''
 
+    self._log = None
+
     def __init__(self, level=3, formatter=None):
-        self.level = level
+        self._level = level
 
-        if formatter is None:
-            self.formatter = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        if not formatter:
+            self._formatter = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         else:
-            self.formatter = formatter
+            self._formatter = formatter
 
-        log = logging.getLogger()
-
-        if self.level == 1:
-            log.setLevel(logging.DEBUG)
-        elif self.level == 2:
-            log.setLevel(logging.INFO)
-        elif self.level == 3:
-            log.setLevel(logging.WARNING)
-        elif self.level == 4:
-            log.setLevel(logging.ERROR)
-        elif self.level == 5:
-            log.setLevel(logging.CRITICAL)
+        self._log = logging.getLogger()
 
         aux = logging.StreamHandler(sys.stdout)
         aux.setLevel(logging.DEBUG)
@@ -35,16 +26,29 @@ class Logger(object):
         aux.setFormatter(formatter)
         log.addHandler(aux)
 
-    def write(self, message, log_level=3):
+    def __set_log_level__(self):
+        '''...'''
+        if self._level == 1:
+            self._log.setLevel(logging.DEBUG)
+        elif self._level == 2:
+            self._log.setLevel(logging.INFO)
+        elif self._level == 3:
+            self._log.setLevel(logging.WARNING)
+        elif self._level == 4:
+            self._log.setLevel(logging.ERROR)
+        elif self._level == 5:
+            self._log.setLevel(logging.CRITICAL)  
+
+    def write(self, message):
         '''...'''
 
-        if log_level == 1:
+        if self._level == 1:
             logging.debug(message)
-        elif log_level == 2:
+        elif self._level == 2:
             logging.info(message)
-        elif log_level == 3:
+        elif self._level == 3:
             logging.warning(message)
-        elif log_level == 4:
+        elif self._level == 4:
             logging.error(message)
-        elif log_level == 5:
+        elif self._level == 5:
             logging.critical(message)

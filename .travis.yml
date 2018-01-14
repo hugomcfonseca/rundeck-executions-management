@@ -1,19 +1,36 @@
 sudo: required
 
+language: shell
+
 services: docker
 
+env:
+  global:
+    - REPO: "hugomcfonseca/rundeck-executions-cleanup"
+    - COMMIT: ${TRAVIS_COMMIT::8}
+
 before_install:
-  - docker build -t hugomcfonseca/rundeck-executions-cleanup:latest .
+  - docker pull ${REPO}:latest
+
+install:
+  - docker build -t ${REPO}: -f Dockerfile .
 
 script:
-  - docker ps -a
+  - docker images | grep 'rundeck-executions-cleanup'
+  - if [[ ${TRAVIS_PULL_REQUEST} = false ]] && [[ $TRAVIS_BRANCH == "master-docker" ]]; then
+      TAG=${TRAVIS_TAG:-"latest"}
+    else
+      TAG=${TRAVIS_PULL_REQUEST_BRANCH}
+    fi
+    export ${TAG}
 
 after_success:
-  - echo "Build info - Branch -> '$TRAVIS_BRANCH' Tag -> '$TRAVIS_TAG'"
-  - echo -e "Push Container to Docker Hub"
-  - docker login -u=$DOCKER_USERNAME -p=$DOCKER_PASSWORD
-  - export REPO=hugomcfonseca/rundeck-executions-cleanup
-  - export TAG=`if [ "$TRAVIS_BRANCH" == "master-docker" ]; then echo "latest"; else echo $TRAVIS_TAG ; fi`
-  - docker build -f Dockerfile -t $REPO:$COMMIT .
-  - docker tag $REPO:$COMMIT $REPO:$TAG
-  - docker push $REPO
+  - echo "Build successfully done."
+    echo "\tBranch name -> '${TRAVIS_BRANCH}'"
+    echo "\tTag -> '${TAG}'"
+
+    echo -e "Push container to Docker Hub"
+    docker login -u=$DOCKER_USERNAME -p=$DOCKER_PASSWORD
+    docker tag $REPO:$COMMIT $REPO:$TAG
+    [ ${TRAVIS_PULL_REQUEST} = false ] && docker push $REPO:$TAG
+    [ "${TAG}" != "latest" ] && [ ${TRAVIS_PULL_REQUEST} = false ] && docker push $REPO
