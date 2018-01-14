@@ -13,7 +13,7 @@ before_install:
   - docker pull ${REPO}:latest
 
 install:
-  - docker build -t ${REPO}: -f Dockerfile .
+  - docker build -t ${REPO}:${COMMIT} -f Dockerfile .
 
 script:
   - docker images | grep 'rundeck-executions-cleanup'
