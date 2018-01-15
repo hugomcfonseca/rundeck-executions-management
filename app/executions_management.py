@@ -173,16 +173,14 @@ def listing_executions(project=None, job=None, only_running=False):
 if __name__ == '__main__':
     signal(SIGINT, base.sigint_handler)
 
-    # Initialization of class objects
-    LOG = Logger(level=2)
-
     # Parse configuration file w/ mandatory parameters to the script
-    CONFIGS = base.parse_args(
-        'Listing running jobs and delete old logs from your Rundeck server.')
+    CONFIGS = base.parse_args('Rundeck manager - listing and maintenance of executions data')
+    # Initialization of class objects
+    LOG = Logger(level=1) if CONFIGS.debug else Logger()
 
     # Validate configuration parameters
     if not base.validate_configs(CONFIGS):
-        LOG.write('Error on passed parameters. Exiting without success...')
+        LOG.write('Error on passed parameters. Exiting without success...', 5)
         exit(1)
 
     # Set up global variables
@@ -200,34 +198,30 @@ if __name__ == '__main__':
         exit(1)
 
     # Set up global variables
-    PROTOCOL = 'http'
-    if CONFIGS.ssl_enabled:
-        PROTOCOL = 'https'
-
-    URL = '{0}://{1}:{2}/api/{3}'.format(PROTOCOL,
-                                         CONFIGS.host, CONFIGS.port, CONFIGS.api_version)
+    PROTOCOL = 'https' if CONFIGS.ssl_enabled else 'http'
+    URL = '{0}://{1}:{2}/api/{3}'.format(PROTOCOL, CONFIGS.host, CONFIGS.port, CONFIGS.api_version)
     HEADERS = {
-        'Content-Type': 'application/json',
         'X-Rundeck-Auth-Token': CONFIGS.auth,
+        'Content-Type': 'application/json',
         'Accept': 'application/json'
     }
 
-    DB_CONNECTOR = DatabaseConn(CONFIGS.db_name, CONFIGS.db_user,
-                                CONFIGS.db_pass, CONFIGS.db_host, CONFIGS.db_port)
-    RUNDECK_API = RundeckApi(URL, HEADERS, DB_CONNECTOR,
-                             CONFIGS.chunk_size, CONFIGS.keep_time, CONFIGS.ssl_enabled)
+    DB_CONNECTOR = DatabaseConn(CONFIGS.db_name, CONFIGS.db_user, CONFIGS.db_pass, CONFIGS.db_host,
+                                CONFIGS.db_port)
+    RUNDECK_API = RundeckApi(URL, HEADERS, DB_CONNECTOR, LOG, CONFIGS.chunk_size, CONFIGS.keep_time,
+                             CONFIGS.ssl_enabled, CONFIGS.search_timeout, CONFIGS.delete_timeout)
 
     # Start execution from available modes
     if CONFIGS.execution_mode == 'cleanup':
-        STATUS, ERROR_MSG = executions_cleanup(CONFIGS.filtered_project)
+        STATUS = RUNDECK_API.clean_executions(CONFIGS.filtered_project, CONFIGS.executions_by_project,
+                                              CONFIGS.retries, CONFIGS.retry_delay, CONFIGS.unoptimized)
     elif CONFIGS.execution_mode == 'listing':
-        STATUS, ERROR_MSG = listing_executions(
-            CONFIGS.filtered_project, CONFIGS.filtered_job, CONFIGS.only_running)
+        STATUS, ERROR_MSG = listing_executions(CONFIGS.filtered_project, CONFIGS.filtered_job,
+                                               CONFIGS.only_running)
     else:
-        LOG.write('No execution mode matching {0}'.format(
-            CONFIGS.execution_mode))
+        LOG.write('No execution mode matching {0}'.format(CONFIGS.execution_mode), 3)
 
     if not STATUS:
-        LOG.write(ERROR_MSG + ' Exiting without success...')
+        LOG.write('Exiting without success...', 4)
 
     exit(not STATUS)

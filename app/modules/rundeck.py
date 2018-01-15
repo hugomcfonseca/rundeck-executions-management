@@ -1,7 +1,9 @@
 #!/usr/bin/python
 
 from json import dumps
+from time import sleep
 from requests import get, post, exceptions
+from .base import get_num_pages
 
 
 class RundeckApi(object):
@@ -13,18 +15,19 @@ class RundeckApi(object):
     and complements deleting executions' data from workflow tables.
     '''
 
-    def __init__(self, url, headers, db_conn, chunk_size=200, keep_time='30d', ssl=False, search_time=60, del_time=300):
+    def __init__(self, url, headers, db_conn, log, chunk_size=200, keep_time='30d', ssl=False, search_time=60, del_time=300):
         '''Initialization of global variables'''
         self._url = url
         self._headers = headers
         self._db = db_conn
+        self._log = log
         self._chunk_size = chunk_size
         self._keep_time = keep_time
         self._check_ssl = ssl
         self._search_time = search_time
         self._del_time = del_time
 
-    def get(self, endpoint, parameters=''):
+    def __get(self, endpoint, parameters=''):
         '''GET requests in Rundeck API endpoints'''
         status = False
         data = ''
@@ -49,7 +52,7 @@ class RundeckApi(object):
 
         return status, data
 
-    def post(self, endpoint, parameters=''):
+    def __post(self, endpoint, parameters=''):
         '''POST requests in Rundeck API endpoints'''
         status = False
         data = ''
@@ -102,7 +105,7 @@ class RundeckApi(object):
         status = False
         data = ''
 
-        status, response = self.get(endpoint)
+        status, response = self.__get(endpoint)
 
         if only_names and status:
             status = True
@@ -125,7 +128,7 @@ class RundeckApi(object):
         status = False
         data = ''
 
-        status, response = self.get(endpoint)
+        status, response = self.__get(endpoint)
 
         if only_ids and status:
             status = True
@@ -162,9 +165,9 @@ class RundeckApi(object):
             }
 
         if running:
-            endpoint = endpoint + '/running'
+            endpoint = '{0}/running'.format(endpoint)
 
-        status, response = self.get(endpoint, parameters)
+        status, response = self.__get(endpoint, parameters)
 
         if only_ids and status:
             status = True
@@ -193,14 +196,14 @@ class RundeckApi(object):
             'max': 1
         }
 
-        status, response = self.get(endpoint, parameters)
+        status, response = self.__get(endpoint, parameters)
 
         if status:
             status = True
             data = self.parse_json_response(response, 'paging', 'total')
         else:
             status = False
-            data = response if data else 'Error parsing JSON response.'
+            data = response if response else 'Error parsing JSON response.'
 
         return status, data
 
@@ -219,7 +222,7 @@ class RundeckApi(object):
         query_res = self._db.query(workflow_stmt)
 
         for workflow_id in query_res:
-            workflow_ids = workflow_ids + ',' + str(workflow_id[0])
+            workflow_ids = '{0},{1}'.format(workflow_ids, str(workflow_id[0]))
 
         workflow_ids = workflow_ids.strip(',')
 
@@ -230,8 +233,7 @@ class RundeckApi(object):
             query_res = self._db.query(workflow_step_stmt)
 
             for workflow_step_id in query_res:
-                workflow_step_ids = workflow_step_ids + \
-                    ',' + str(workflow_step_id[0])
+                workflow_step_ids = '{0},{1}'.format(workflow_step_ids, str(workflow_step_id[0]))
 
             workflow_step_ids = workflow_step_ids.strip(',')
 
@@ -247,7 +249,7 @@ class RundeckApi(object):
         status = False
         msg = ''
 
-        status, response = self.post(endpoint, data)
+        status, response = self.__post(endpoint, data)
 
         if status:
             all_succedeed = self.parse_json_response(response, 'allsuccessful')
@@ -282,9 +284,10 @@ class RundeckApi(object):
 
         return True, ''
 
-    def clean_project_executions(self, project, logger = False):
+    def clean_project_executions(self, project, retries=5, backoff=5, unoptimized=False):
         '''Clean executions older than a given time by from a project'''
         status, total = self.get_total_executions(project, False)
+        pages = 0
 
         if not status:
             msg = "[{0}]: Error returning executions counter.".format(project)
@@ -292,21 +295,80 @@ class RundeckApi(object):
         else:
             if total > 0:
                 msg = "[{0}]: There are {1} executions to delete.".format(project, total)
+                self._log.write(msg, 2)
+                pages = get_num_pages(total, self._chunk_size)
+                msg = "Processing deleting in {0} cycles.".format(pages)
+                self._log.write(msg, 2)
             else:
-                msg = "[{0}]: No executions available for deleting.".format(project)
-                return True, msg
+                msg = "[{0}]: No available executions for deleting.".format(project)
+                self._log.write(msg, 2)
 
-        
+            for page in range(0, pages):
+                n_retries = 0
+                status, executions = self.get_executions(project, page, False)
 
-        return True, msg
+                if status:
+                    interval = [page * self._chunk_size, page * self._chunk_size + len(executions)]
+                    msg = '[{0}]: Deleting range {1} to {2}'.format(project, interval[0], interval[1])
+                    self._log.write(msg, 1)
+                    for attempt in range(0, retries):
+                        n_retries += 1
+                        workflows, steps, err_wf = self.get_workflow_ids(executions)
 
-    def clean_executions(self, project=None):
+                        if not workflows or not steps:
+                            return False, err_wf
+
+                        msg = '[{0}] Removing following executions -> {1}'.format(project, executions)
+                        self._log.write(msg, 1)
+                        msg = '[{0}] Removing following workflows -> {1}'.format(project, workflows)
+                        self._log.write(msg, 1)
+                        msg = '[{0}] Removing following workflow steps -> {1}'.format(project, steps)
+                        self._log.write(msg, 1)
+
+                        status_exec, _ = self.delete_executions(executions)
+                        status_wf, _ = self.delete_workflows(workflows, steps, unoptimized)
+
+                        if status_exec and status_wf:
+                            break
+                        elif not (status_exec or status_wf) and n_retries <= retries:
+                            sleep(backoff)
+                            msg = '[{0}] #{1} try not succeded. Trying again in {2} seconds...'.format(project, retries, backoff)
+                            self._log.write(msg, 1)
+                            continue
+                        else:
+                            msg = '[{0}]: Error deleting executions.'.format(project)
+                            return False, msg
+                else:
+                    msg = '[{0}]: Error getting executions.'.format(project)
+                    return False, msg
+
+        return True, total
+
+    def clean_executions(self, project=None, project_order=True, retries=5, backoff=5, unoptimized=False):
         '''Clean all executions data older than a given time'''
         n_cleaned = 0
         project_filter = True if project else False
-        
-        projects = project if project_filter else self.get_projects()
 
-        
+        if project_filter:
+            projects = project
+        else:
+            status, projects = self.get_projects()
 
-        return True, ''
+        # Condition status
+        if not status:
+            return status, projects
+
+        for proj in projects:
+            if not project_filter or proj == project:
+                if project_order:
+                    status, data = self.clean_project_executions(proj, retries, backoff, unoptimized)
+                else:
+                    self._log.write('Working on it...', 5)
+
+                if not status:
+                    self._log.write(data, 4)
+                    return False
+                else:
+                    n_cleaned += int(data)
+
+        return True
