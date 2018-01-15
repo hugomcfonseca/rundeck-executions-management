@@ -3,7 +3,7 @@
 echo "Build successfully done."
 
 if [[ ${TRAVIS_PULL_REQUEST} == false ]]; then
-    echo 1"\t- Branch: '${TRAVIS_BRANCH}'"
+    echo "\t- Branch: '${TRAVIS_BRANCH}'"
     echo "\t- Tag: '${TAG}'"
 else
     echo 1"\t- Pull Rquest: '${TRAVIS_PULL_REQUEST}'"
