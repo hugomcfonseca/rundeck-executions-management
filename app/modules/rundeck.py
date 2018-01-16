@@ -77,6 +77,43 @@ class RundeckApi(object):
 
         return status, data
 
+    def __delete_executions_data(self, identifier, executions, page, retries=5, backoff=5, unoptimized=False):
+        '''Private function to delete both executions and workflows'''
+        n_retries = 0
+        interval = [page * self._chunk_size, page * self._chunk_size + len(executions)]
+        msg = '[{0}]: Deleting range {1} to {2}'.format(identifier, interval[0], interval[1])
+        self._log.write(msg, 1)
+
+        for attempt in range(0, retries):
+            n_retries += 1
+            workflows, steps, err_wf = self.get_workflow_ids(executions)
+
+            if not workflows or not steps:
+                return False, err_wf
+
+            msg = '[{0}] Removing following executions -> {1}'.format(identifier, executions)
+            self._log.write(msg, 1)
+            msg = '[{0}] Removing following workflows -> {1}'.format(identifier, workflows)
+            self._log.write(msg, 1)
+            msg = '[{0}] Removing following workflow steps -> {1}'.format(identifier, steps)
+            self._log.write(msg, 1)
+
+            status_exec, _ = self.delete_executions(executions)
+            status_wf, _ = self.delete_workflows(workflows, steps, unoptimized)
+
+            if status_exec and status_wf:
+                break
+            elif not (status_exec or status_wf) and n_retries <= retries:
+                sleep(backoff)
+                msg = '[{0}] #{1} try not succeeded. Trying again in {2} seconds.'.format(identifier, retries, backoff)
+                self._log.write(msg, 1)
+                continue
+            else:
+                msg = '[{0}]: Error deleting executions.'.format(identifier)
+                return False, msg
+
+        return True, ''
+
     def parse_json_response(self, response, filter_by='', appender=''):
         '''...'''
         parsed_response = []
@@ -308,36 +345,48 @@ class RundeckApi(object):
                 status, executions = self.get_executions(project, page, False)
 
                 if status:
-                    interval = [page * self._chunk_size, page * self._chunk_size + len(executions)]
-                    msg = '[{0}]: Deleting range {1} to {2}'.format(project, interval[0], interval[1])
-                    self._log.write(msg, 1)
-                    for attempt in range(0, retries):
-                        n_retries += 1
-                        workflows, steps, err_wf = self.get_workflow_ids(executions)
+                    success, msg = self.__delete_executions_data(project, executions, page, retries, backoff, unoptimized)
+                    
+                    if success:
+                        break
+                    else:
+                        return False, msg
+                else:
+                    msg = '[{0}]: Error getting executions.'.format(project)
+                    return False, msg
 
-                        if not workflows or not steps:
-                            return False, err_wf
+        return True, total
 
-                        msg = '[{0}] Removing following executions -> {1}'.format(project, executions)
-                        self._log.write(msg, 1)
-                        msg = '[{0}] Removing following workflows -> {1}'.format(project, workflows)
-                        self._log.write(msg, 1)
-                        msg = '[{0}] Removing following workflow steps -> {1}'.format(project, steps)
-                        self._log.write(msg, 1)
+    def clean_job_executions(self, job, retries=5, backoff=5, unoptimized=False):
+        '''...'''
+        status, total = self.get_total_executions(job)
+        pages = 0
 
-                        status_exec, _ = self.delete_executions(executions)
-                        status_wf, _ = self.delete_workflows(workflows, steps, unoptimized)
+        if not status:
+            msg = "[{0}]: Error returning executions counter.".format(project)
+            return False, msg
+        else:
+            if total > 0:
+                msg = "[{0}]: There are {1} executions to delete.".format(job, total)
+                self._log.write(msg, 2)
+                pages = get_num_pages(total, self._chunk_size)
+                msg = "Processing deleting in {0} cycles.".format(pages)
+                self._log.write(msg, 2)
+            else:
+                msg = "[{0}]: No available executions for deleting.".format(job)
+                self._log.write(msg, 2)
 
-                        if status_exec and status_wf:
-                            break
-                        elif not (status_exec or status_wf) and n_retries <= retries:
-                            sleep(backoff)
-                            msg = '[{0}] #{1} try not succeded. Trying again in {2} seconds...'.format(project, retries, backoff)
-                            self._log.write(msg, 1)
-                            continue
-                        else:
-                            msg = '[{0}]: Error deleting executions.'.format(project)
-                            return False, msg
+            for page in range(0, pages):
+                n_retries = 0
+                executions = self.get_executions(job, actual_page)
+
+                if status:
+                    success, msg = self.__delete_executions_data(job, executions, page, retries, backoff, unoptimized)
+                    
+                    if success:
+                        break
+                    else:
+                        return False, msg
                 else:
                     msg = '[{0}]: Error getting executions.'.format(project)
                     return False, msg
@@ -346,7 +395,7 @@ class RundeckApi(object):
 
     def clean_executions(self, project=None, project_order=True, retries=5, backoff=5, unoptimized=False):
         '''Clean all executions data older than a given time'''
-        n_cleaned = 0
+        stats_total = 0
         project_filter = True if project else False
 
         if project_filter:
@@ -363,12 +412,21 @@ class RundeckApi(object):
                 if project_order:
                     status, data = self.clean_project_executions(proj, retries, backoff, unoptimized)
                 else:
-                    self._log.write('Working on it...', 5)
+                    status, jobs = self.get_jobs_by_project(project)
+                    
+                    if status:
+                        for job in jobs:
+                            status, data = self.clean_job_executions(job, retries, backoff, unoptimized)
 
                 if not status:
                     self._log.write(data, 4)
                     return False
                 else:
-                    n_cleaned += int(data)
+                    msg = '[{0} -> statistics: {1} old executions deleted.'.format(proj, int(data))
+                    self._log.write(msg, 3)
+                    stats_total += int(data)
+
+        msg = 'Global statistics: {0} old executions deleted.'.format(stats_total)
+        self._log.write(msg, 3)
 
         return True
