@@ -82,7 +82,7 @@ class RundeckApi(object):
         n_retries = 0
         interval = [page * self._chunk_size, page * self._chunk_size + len(executions)]
         msg = '[{0}]: Deleting range {1} to {2}'.format(identifier, interval[0], interval[1])
-        self._log.write(msg, 1)
+        self._log.write(msg, 2)
 
         for attempt in range(0, retries):
             n_retries += 1
@@ -346,10 +346,8 @@ class RundeckApi(object):
 
                 if status:
                     success, msg = self.__delete_executions_data(project, executions, page, retries, backoff, unoptimized)
-                    
-                    if success:
-                        break
-                    else:
+
+                    if not success:
                         return False, msg
                 else:
                     msg = '[{0}]: Error getting executions.'.format(project)
@@ -382,10 +380,8 @@ class RundeckApi(object):
 
                 if status:
                     success, msg = self.__delete_executions_data(job, executions, page, retries, backoff, unoptimized)
-                    
-                    if success:
-                        break
-                    else:
+
+                    if not success:
                         return False, msg
                 else:
                     msg = '[{0}]: Error getting executions.'.format(project)
