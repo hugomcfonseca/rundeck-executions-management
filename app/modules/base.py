@@ -27,6 +27,8 @@ def parse_args(message=None):
                         help='Rundeck database password')
     parser.add_argument('--filtered-project', metavar='Project', type=str, default=None,
                         help='Filter by a given project')
+    parser.add_argument('--filtered-job', metavar='Job ID', type=str, default=None,
+                        help='Filter by a given job UUID')
     parser.add_argument('--api-version', metavar='Version', type=int, default=19,
                         help='Rundeck API version (default: 19)')
     parser.add_argument('--search-timeout', metavar='Seconds', type=int, default=60,
@@ -45,6 +47,8 @@ def parse_args(message=None):
                         help='Rundeck is served over SSL (default: false)')
     parser.add_argument('--executions-by-project', action='store_false',
                         help='Filter executions by project (default: true)')
+    parser.add_argument('--running', action='store_true',
+                        help='Filter only running executions (default: false)')
     parser.add_argument('--unoptimized', action='store_true',
                         help='Run all operations in workflow tables (default: false)')
     parser.add_argument('--debug', action='store_true',
@@ -85,32 +89,6 @@ def validate_configs(configs):
         return False, "Invalid time to keep old records."
 
     return True, ""
-
-
-def parse_json_response(http_response, filter_by=None, append_by=None):
-    '''...'''
-    data_info = []
-
-    if http_response.ok:
-        json_response = http_response.json()
-
-        if filter_by:
-            response_filtered = json_response[filter_by]
-        else:
-            response_filtered = json_response
-
-        if isinstance(response_filtered, list):
-            for data in response_filtered:
-                if append_by is not None:
-                    data_info.append(data[append_by])
-                else:
-                    data_info.append(data)
-        else:
-            data_info = response_filtered
-
-        return True, data_info
-
-    return False, http_response.status_code
 
 
 def sigint_handler(signum, frame):

@@ -1,0 +1,24 @@
+sudo: required
+
+language: shell
+
+services: docker
+
+env:
+  global:
+    - REPO: "hugomcfonseca/rundeck-executions-cleanup"
+    - COMMIT: ${TRAVIS_COMMIT::8}
+
+before_install:
+  - docker pull ${REPO}:latest
+  - chmod -R 550 ./contrib/travis/
+
+install:
+  - docker build -t ${REPO}:${COMMIT} -f Dockerfile .
+
+script:
+  - docker images | grep 'rundeck-executions-cleanup'
+  - export TAG=`if [[ ${TRAVIS_PULL_REQUEST} = false ]]; then echo ${TRAVIS_TAG:-"latest"}; else echo ${TRAVIS_PULL_REQUEST_BRANCH} fi`
+
+after_success:
+  - . ./contrib/travis/push.sh
