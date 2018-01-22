@@ -1,10 +1,17 @@
 # rundeck-executions-management
 
-Python script to remove Rundeck executions data using Rundeck API.
+Python tool to remove executions data from Rundeck using Rundeck API.
 
 Rundeck API will clean up executions data from both database and filesystem. However, it does not remove all related executions' data from database - it only cleans up data from `base_report` and `execution` tables. This will maintain unnecessary data in database, specifically, in the following database tables: `workflow`, `workflow_step` and `workflow_workflow_step`. To overcome this issue, it was implemented on the script to connect to database and also cleaning up this data.
 
+It is provided two different ways to run old data maintenance in Rundeck:
+
+- **Standalone**: download latest code from `master` branch and execute it from where you may want, or
+- **Docker**: launch container to run Rundeck maintenance and exit after finish it or periodically execute it in a cron job (check it in `master-docker` branch for stable version).
+
 ## Getting Started
+
+### Standalone
 
 By default, this script needs at least one parameter: a valid token. Others parameters are assumed by default and can be overriden. Next, it is showed all available parameters:
 
@@ -20,7 +27,8 @@ By default, this script needs at least one parameter: a valid token. Others para
   --db-user <user>                Rundeck database user (default: rundeck)
   --db-pass <password>            Rundeck database password
   --filtered-project <project>    Filter by a given project
-  --api-version <version>         Rundeck API version (default: 19)
+  --filtered-job <job>            Filter by a given job UUID
+  --api-version <version>         Rundeck API version (default: 20)
   --search-timeout <seconds>      Timeout to expire HTTP GET requests (default: 60)
   --delete-timeout <seconds>      Timeout to expire HTTP POST requests (default: 300)
   --keep-time <time>              Period of time to keep executions records (default: 30d)
@@ -29,8 +37,36 @@ By default, this script needs at least one parameter: a valid token. Others para
   --retry-delay <seconds>         Delay to start next retry (default: 5)
   --ssl-enabled                   Rundeck is served over SSL (default: false)
   --executions-by-project         Filter executions by project (default: true)
+  --unoptimized                   Run all queries in workflows tables (default: false)
+  --running                       Filter by only running executions (default: false)
   --debug                         Print all operations (default: false)
 ```
+
+### Docker
+
+| Env variable | Default  | Required | Description |
+| --- | --- | --- | --- |
+| `RD_TOKEN` |  | Yes | Rundeck token to access its API |
+| `RD_HOST` | `localhost` | Yes | Rundeck host or domain address |
+| `RD_PORT` | `4440` | Yes | Rundeck port |
+| `RD_SSL` | `false` | Yes | Flag to assign Rundeck is over SSL |
+| `RD_DB_HOST` | `mysql-host` | Yes | Host of Rundeck database |
+| `RD_DB_PORT` | `3306` | Yes | Port of Rundeck database |
+| `RD_DB_NAME` | `rundeck` | Yes | Name of Rundeck database |
+| `RD_DB_USER` | `rundeck` | Yes | User name of Rundeck database |
+| `RD_DB_PASS` |  | Yes | User's password of Rundeck password |
+| `KEEP_TIME` | `30d` | Yes | Period of time to keep executions records |
+| `CHUNK_SIZE` | `200` | Yes | Size of each delete iteration |
+| `RD_API_VERSION` | `20` | Yes | Rundeck API version |
+| `RD_PROJECT` |  | No | Run cleanup to a given project |
+| `SEARCH_TIMEOUT` | `60` | No | Timeout to expire HTTP GET requests (in _seconds_) |
+| `DELETE_TIMEOUT` | `300` | No | Timeout to expire HTTP POST requests (in _seconds_) |
+| `RETRY_TIMES` | `5` | No | Number of retries when some error occur |
+| `RETRY_BACKOFF` | `5` | No | Delay to start next retry (in _seconds_) |
+| `DEBUG` | `false` | No | Used to print all operations during clean up  |
+| `RD_DB_UNOPTIMIZED` | `false` | No | Assign to true when database queries below were not run |
+| `ONETIME_RUNNING` | `false` | No | Running mode of script (**run & exit** or by a **cron**) |
+| `SCHEDULE` | `* 0 * * *` | No | Time schema which script may run (in cron mode) |
 
 ## Tuning Rundeck database to speed up its cleaning
 
@@ -57,14 +93,39 @@ ALTER TABLE `workflow_workflow_step` ADD CONSTRAINT `FK_9pkey6k5fdo6worgquakkh7d
 
 ## Usage
 
-### **#1:** Cleanup old records with default arguments' values (local Rundeck server)
+### Standalone
+
+#### 1. Cleanup old records with default arguments' values (local Rundeck server)
 
 ```sh
 $ python executions_management.py --auth YOUR_TOKEN
 ```
 
-### **#2:** Cleanup old records in a remote Rundeck server (available over SSL)
+#### 2. Cleanup old records in a remote Rundeck server (available over SSL)
 
 ```sh
 $ python executions_management.py --auth-token YOUR_TOKEN --host rundeck.domain.com --port 443 --ssl-enabled
 ```
+
+### Docker
+
+#### 1. Launch a container to run maintenance periodically
+
+```sh
+$ docker run -it -d --name rundeck-maintenance --link rundeck_db:mysql-host \
+    -e RD_TOKEN="SECRET_TOKEN" \
+    -e RD_DB_PASS="SECRET_DB_PASS" \
+    hugomcfonseca/rundeck-executions-cleanup:latest
+```
+
+#### 2. Launch a container to run maintenance once
+
+```sh
+$ docker run -it -d --name rundeck-maintenance --link rundeck_db:mysql-host \
+    -e RD_TOKEN="SECRET_TOKEN" \
+    -e RD_DB_PASS="SECRET_DB_PASS" \
+    -e ONETIME_RUNNING="true" \
+    hugomcfonseca/rundeck-executions-cleanup:latest
+```
+
+Please notice, if you don't want to create a linked connection to Rundeck database, you are able to specify it using environment variables.
