@@ -423,7 +423,7 @@ class RundeckApi(object):
                     stats_total += int(data)
 
         msg = 'Global statistics: {0} old executions deleted.'.format(stats_total)
-        self._log.write(msg, 3)
+        self._log.write(msg, 2)
 
         return True, ''
 
