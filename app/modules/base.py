@@ -70,8 +70,8 @@ def validate_configs(configs):
     if not (configs.port >= 1024 and configs.port <= 65535):
         return False, "Invalid port number."
 
-    if configs.api_version not in range(1, 21):
-        return False, "Invalid API version."
+    if configs.api_version not in range(14, 21):
+        return False, "Minimum API version not met."
 
     if configs.search_timeout <= 0:
         return False, "Invalid searching timeout value."
