@@ -27,7 +27,7 @@ if [ ! -z $RD_PROJECT ]; then
     OPTS_PARAMS="$OPTS_PARAMS --filtered-project ${RD_PROJECT}"
 fi
 
-python /app/executions_management.py \
+python3 /app/executions_management.py \
         --auth "${RD_TOKEN}" \
         --host "${RD_HOST}" \
         --port ${RD_PORT} \

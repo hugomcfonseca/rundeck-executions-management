@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 from logging import getLogger, StreamHandler, Formatter, debug, info, warning, error, critical, \
                     DEBUG, INFO, WARNING, ERROR, CRITICAL

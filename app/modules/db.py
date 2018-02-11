@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 from mysql.connector import errorcode, connect, Error
 

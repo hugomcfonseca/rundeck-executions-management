@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 from os import environ
 from signal import signal, SIGINT
@@ -33,7 +33,7 @@ if __name__ == '__main__':
     elif CONF.db_pass != '' and not 'DATASOURCE_PASSWORD' in environ:
         DB_PASS = CONF.db_pass
     else:
-        print('Missing database password.')
+        LOG.write('Missing database password.')
         exit(1)
 
     # Set up global variables

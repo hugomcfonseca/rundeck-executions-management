@@ -84,7 +84,7 @@ class RundeckApi(object):
         msg = '[{0}]: Deleting range {1} to {2}'.format(identifier, interval[0], interval[1])
         self._log.write(msg, 2)
 
-        for attempt in range(0, retries):
+        for _ in range(0, retries):
             n_retries += 1
             workflows, steps, err_wf = self.get_workflow_ids(executions)
 
@@ -289,8 +289,8 @@ class RundeckApi(object):
         status, response = self.__post(endpoint, data)
 
         if status:
-            all_succedeed = self.parse_json_response(response, 'allsuccessful')
-            if all_succedeed:
+            all_succeeded = self.parse_json_response(response, 'allsuccessful')
+            if all_succeeded:
                 status = True
             else:
                 status = False
@@ -341,7 +341,6 @@ class RundeckApi(object):
                 self._log.write(msg, 2)
 
             for page in range(0, pages):
-                n_retries = 0
                 status, executions = self.get_executions(project, page, False)
 
                 if status:
@@ -361,7 +360,7 @@ class RundeckApi(object):
         pages = 0
 
         if not status:
-            msg = "[{0}]: Error returning executions counter.".format(project)
+            msg = "[{0}]: Error returning executions counter.".format(job)
             return False, msg
         else:
             if total > 0:
@@ -375,8 +374,7 @@ class RundeckApi(object):
                 self._log.write(msg, 2)
 
             for page in range(0, pages):
-                n_retries = 0
-                executions = self.get_executions(job, actual_page)
+                executions = self.get_executions(job, page)
 
                 if status:
                     success, msg = self.__delete_executions_data(job, executions, page, retries, backoff, unoptimized)
@@ -384,7 +382,7 @@ class RundeckApi(object):
                     if not success:
                         return False, msg
                 else:
-                    msg = '[{0}]: Error getting executions.'.format(project)
+                    msg = '[{0}]: Error getting executions.'.format(job)
                     return False, msg
 
         return True, total
@@ -419,7 +417,7 @@ class RundeckApi(object):
                     return False
                 else:
                     msg = '[{0} -> statistics: {1} old executions deleted.'.format(proj, int(data))
-                    self._log.write(msg, 3)
+                    self._log.write(msg, 2)
                     stats_total += int(data)
 
         msg = 'Global statistics: {0} old executions deleted.'.format(stats_total)
@@ -447,15 +445,15 @@ class RundeckApi(object):
             status, executions = self.get_executions(row, 0, False, False, only_running)
 
             if not status:
-                err_msg = '[{0}] Error getting executions.'.format(proj)
+                err_msg = '[{0}] Error getting executions.'.format(row)
                 return False, err_msg
 
             for ex in executions:
                 if filter_job and ex['job']['name'] == job:
                     msg = '[{0}] - \'{1}\'  {2}'.format(ex['project'], ex['job']['name'], ex['status'])
-                    self._log.write(msg)
+                    self._log.write(msg, 2)
                 elif not filter_job:
                     msg = '[{0}] - \'{1}\' is {2}'.format(ex['project'], ex['job']['name'], ex['status'])
-                    self._log.write(msg)
+                    self._log.write(msg, 2)
 
         return True, ''
