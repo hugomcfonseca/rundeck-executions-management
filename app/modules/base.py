@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 from argparse import ArgumentParser
 from math import ceil
@@ -97,5 +97,4 @@ def sigint_handler(signum, frame):
         if raw_input("\nReally quit? (y/n)> ").lower().startswith('y'):
             exit(1)
     except KeyboardInterrupt:
-        print("Quitting...")
         exit(1)

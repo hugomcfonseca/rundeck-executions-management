@@ -5,9 +5,9 @@ LABEL maintainer='Hugo Fonseca <https://github.com/hugomcfonseca>'
 WORKDIR /app
 
 ENV \
-    PKGS='python py-requests' \
-    DEPS='mysql-dev gnupg file gcc py-pip musl-dev g++' \
-    MYSQL_CONN_VERSION='2.1.7' \
+    PKGS='python3 py3-requests' \
+    DEPS='mysql-dev gnupg file gcc musl-dev g++' \
+    MYSQL_CONN_VERSION='8.0.6' \
     \
     RD_TOKEN='' \
     RD_HOST='localhost' \
@@ -39,8 +39,7 @@ COPY entrypoint.sh /
 RUN \
     apk add --update --no-cache ${PKGS} && \
     apk add --update --no-cache --virtual .deps ${DEPS} && \
-    pip install -U pip wheel && \
-    pip install http://dev.mysql.com/get/Downloads/Connector-Python/mysql-connector-python-${MYSQL_CONN_VERSION}.tar.gz && \
+    pip3 install -U pip wheel mysql-connector-python==${MYSQL_CONN_VERSION} && \
     chmod +x /app/run.sh /entrypoint.sh && \
     apk del .deps && rm -rf /var/cache/apk/* /tmp/* /var/tmp/*
 
