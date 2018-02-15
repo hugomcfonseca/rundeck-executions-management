@@ -98,3 +98,12 @@ def sigint_handler(signum, frame):
             exit(1)
     except KeyboardInterrupt:
         exit(1)
+
+
+def get_formatted_time(time):
+    '''...'''
+    hours = int(time.seconds / 3600)
+    minutes = int((time.seconds / 60) % 60)
+    seconds = int(time.seconds % 60)
+
+    return hours, minutes, seconds
