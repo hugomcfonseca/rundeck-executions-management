@@ -82,7 +82,7 @@ class RundeckApi(object):
         n_retries = 0
         interval = [page * self._chunk_size, page * self._chunk_size + len(executions)]
         msg = '[{0}]: Deleting range {1} to {2}'.format(identifier, interval[0], interval[1])
-        self._log.write(msg, 2)
+        self._log.write(msg)
 
         for _ in range(0, retries):
             n_retries += 1
@@ -332,13 +332,13 @@ class RundeckApi(object):
         else:
             if total > 0:
                 msg = "[{0}]: There are {1} executions to delete.".format(project, total)
-                self._log.write(msg, 2)
+                self._log.write(msg)
                 pages = get_num_pages(total, self._chunk_size)
                 msg = "Processing deleting in {0} cycles.".format(pages)
-                self._log.write(msg, 2)
+                self._log.write(msg)
             else:
                 msg = "[{0}]: No available executions for deleting.".format(project)
-                self._log.write(msg, 2)
+                self._log.write(msg)
 
             for page in range(0, pages):
                 status, executions = self.get_executions(project, page, False)
@@ -365,13 +365,13 @@ class RundeckApi(object):
         else:
             if total > 0:
                 msg = "[{0}]: There are {1} executions to delete.".format(job, total)
-                self._log.write(msg, 2)
+                self._log.write(msg)
                 pages = get_num_pages(total, self._chunk_size)
                 msg = "Processing deleting in {0} cycles.".format(pages)
-                self._log.write(msg, 2)
+                self._log.write(msg)
             else:
                 msg = "[{0}]: No available executions for deleting.".format(job)
-                self._log.write(msg, 2)
+                self._log.write(msg)
 
             for page in range(0, pages):
                 executions = self.get_executions(job, page)
@@ -397,7 +397,6 @@ class RundeckApi(object):
         else:
             status, projects = self.get_projects()
 
-        # Condition status
         if not status:
             return status, projects
 
@@ -416,12 +415,12 @@ class RundeckApi(object):
                     self._log.write(data, 4)
                     return False
                 else:
-                    msg = '[{0} -> statistics: {1} old executions deleted.'.format(proj, int(data))
-                    self._log.write(msg, 2)
+                    msg = '[{0}] statistics: {1} old executions deleted.'.format(proj, int(data))
+                    self._log.write(msg)
                     stats_total += int(data)
 
         msg = 'Global statistics: {0} old executions deleted.'.format(stats_total)
-        self._log.write(msg, 2)
+        self._log.write(msg)
 
         return True, ''
 
@@ -451,9 +450,9 @@ class RundeckApi(object):
             for ex in executions:
                 if filter_job and ex['job']['name'] == job:
                     msg = '[{0}] - \'{1}\'  {2}'.format(ex['project'], ex['job']['name'], ex['status'])
-                    self._log.write(msg, 2)
+                    self._log.write(msg)
                 elif not filter_job:
                     msg = '[{0}] - \'{1}\' is {2}'.format(ex['project'], ex['job']['name'], ex['status'])
-                    self._log.write(msg, 2)
+                    self._log.write(msg)
 
         return True, ''
