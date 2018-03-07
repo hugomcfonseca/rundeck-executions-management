@@ -278,6 +278,88 @@ class RundeckApi(object):
 
         return workflow_ids, workflow_step_ids, ''
 
+    def get_inconsistent_data(self, unoptimized=False):
+        '''Return all inconsistent data from workflow and related tables'''
+        self._db.open()
+
+        workflow_ids = ''
+        workflow_step_ids = ''
+        w_workflow_step_ids = ''
+
+        workflow_stmt = '''
+            SELECT id
+            FROM workflow
+            WHERE
+                id < (
+                    SELECT MIN(workflow_id)
+                    FROM execution
+                )
+            AND
+                id NOT IN (
+                    SELECT workflow_id
+                    FROM scheduled_execution
+                )
+        '''
+
+        query_res = self._db.query(workflow_stmt)
+
+        for workflow_id in query_res:
+            workflow_ids = '{0},{1}'.format(workflow_ids, str(workflow_id[0]))
+
+        workflow_ids = workflow_ids.strip(',')
+
+        workflow_step_stmt = '''
+            SELECT id
+            FROM workflow_step
+            WHERE id IN (
+                SELECT workflow_step_id
+                FROM workflow_workflow_step
+                WHERE
+                    workflow_commands_id < (
+                        SELECT MIN(workflow_id)
+                        FROM execution
+                    )
+                AND
+                    workflow_commands_id NOT IN (
+                        SELECT workflow_id
+                        FROM scheduled_execution
+                    )
+            )
+        '''
+
+        query_res = self._db.query(workflow_step_stmt)
+
+        for workflow_step_id in query_res:
+            workflow_step_ids = '{0},{1}'.format(workflow_step_ids, str(workflow_step_id[0]))
+
+        workflow_step_ids = workflow_step_ids.strip(',')
+
+        w_workflow_step_stmt = '''
+            SELECT workflow_commands_id
+            FROM workflow_workflow_step
+            WHERE
+                workflow_commands_id < (
+                    SELECT MIN(workflow_id)
+                    FROM execution
+                )
+            AND
+                workflow_commands_id NOT IN (
+                    SELECT workflow_id
+                    FROM scheduled_execution
+                )
+        '''
+
+        query_res = self._db.query(w_workflow_step_stmt)
+
+        if unoptimized:
+            for w_workflow_step_id in query_res:
+                w_workflow_step_ids = '{0},{1}'.format(w_workflow_step_ids, str(w_workflow_step_id[0]))
+
+            w_workflow_step_ids = w_workflow_step_ids.strip(',')
+
+        return workflow_ids, workflow_step_ids, w_workflow_step_ids
+
+
     def delete_executions(self, executions_ids):
         '''Bulk deletions of Rundeck executions'''
 
@@ -304,6 +386,30 @@ class RundeckApi(object):
         if workflow_ids and unoptimized:
             work_workflow_delete = 'DELETE FROM workflow_workflow_step WHERE workflow_commands_id IN ({0})'.format(
                 workflow_ids)
+            self._db.query(work_workflow_delete)
+
+        if workflow_step_ids:
+            workflow_step_delete = 'DELETE FROM workflow_step WHERE id IN ({0})'.format(
+                workflow_step_ids)
+            self._db.query(workflow_step_delete)
+
+        if workflow_ids:
+            workflow_delete = 'DELETE FROM workflow WHERE id IN ({0})'.format(
+                workflow_ids)
+            self._db.query(workflow_delete)
+
+        self._db.apply()
+        self._db.close()
+
+        return True, ''
+
+    def delete_inconsistent_data(self, workflow_ids, workflow_step_ids, w_workflow_step_ids, unoptimized=False):
+        '''Deletion of inconsistent data from workflow and related tables'''
+        self._db.open()
+
+        if w_workflow_step_ids and unoptimized:
+            work_workflow_delete = 'DELETE FROM workflow_workflow_step WHERE workflow_commands_id IN ({0})'.format(
+                workflow_step_ids)
             self._db.query(work_workflow_delete)
 
         if workflow_step_ids:
@@ -352,6 +458,12 @@ class RundeckApi(object):
                     msg = '[{0}]: Error getting executions.'.format(project)
                     return False, msg
 
+            workflows, steps, w_steps = self.get_inconsistent_data(unoptimized)
+            status, err_u_wf = self.delete_inconsistent_data(workflows, steps, w_steps, unoptimized)
+
+            if not status:
+                return False, err_u_wf
+
         return True, total
 
     def clean_job_executions(self, job, retries=5, backoff=5, unoptimized=False):
@@ -385,6 +497,14 @@ class RundeckApi(object):
                     msg = '[{0}]: Error getting executions.'.format(job)
                     return False, msg
 
+            workflows, steps, w_steps = self.get_inconsistent_data(unoptimized)
+            msg = 'Deleting wxisting inconsistent data.'
+            self._log.write(msg)
+            status, err_u_wf = self.delete_inconsistent_data(workflows, steps, w_steps, unoptimized)
+
+            if not status:
+                return False, err_u_wf
+
         return True, total
 
     def clean_executions(self, project=None, project_order=True, retries=5, backoff=5, unoptimized=False):
@@ -406,7 +526,7 @@ class RundeckApi(object):
                     status, data = self.clean_project_executions(proj, retries, backoff, unoptimized)
                 else:
                     status, jobs = self.get_jobs_by_project(project)
-                    
+
                     if status:
                         for job in jobs:
                             status, data = self.clean_job_executions(job, retries, backoff, unoptimized)
