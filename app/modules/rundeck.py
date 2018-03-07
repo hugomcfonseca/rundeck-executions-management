@@ -459,6 +459,8 @@ class RundeckApi(object):
                     return False, msg
 
             workflows, steps, w_steps = self.get_inconsistent_data(unoptimized)
+            msg = 'Deleting wxisting inconsistent data.'
+            self._log.write(msg)
             status, err_u_wf = self.delete_inconsistent_data(workflows, steps, w_steps, unoptimized)
 
             if not status:
