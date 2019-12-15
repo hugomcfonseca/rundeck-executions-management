@@ -1,4 +1,4 @@
-FROM alpine:3.8
+FROM alpine:3.10
 
 LABEL maintainer='Hugo Fonseca <https://github.com/hugomcfonseca>'
 
@@ -7,7 +7,7 @@ WORKDIR /app
 ENV \
     PKGS='python3 py3-requests' \
     DEPS='mysql-dev gnupg file gcc musl-dev g++' \
-    MYSQL_CONN_VERSION='8.0.11' \
+    MYSQL_CONN_VERSION='8.0.18' \
     \
     RD_TOKEN='' \
     RD_HOST='localhost' \
